@@ -14,6 +14,20 @@ import config
 PHOTON = "https://photon.komoot.io/api/"
 HEADERS = {"User-Agent": "radar-inmobiliario/1.0 (busqueda casa personal)"}
 
+# Nombre de localidad de ArgenProp según idlocalidad (para geolocalizar con la
+# localidad REAL del aviso y no ubicar todo en Banfield por error).
+AP_LOCALIDADES = {
+    "1175": "Banfield", "1177": "Lomas de Zamora", "1178": "Temperley",
+    "1176": "Llavallol", "1179": "Turdera", "2035": "Ingeniero Budge",
+}
+
+
+def localidad_de(source, idlocalidad, raw_locality):
+    """Localidad real del aviso, para usar como contexto de geolocalización."""
+    if source == "argenprop":
+        return AP_LOCALIDADES.get(str(idlocalidad), "Lomas de Zamora")
+    return (raw_locality or "Banfield").strip()
+
 
 def geocode(address, context="Buenos Aires", bias=None, client=None):
     """Devuelve (lat, lon) o None. `bias` = [lat, lon] para priorizar la zona."""
@@ -88,22 +102,15 @@ def enrich(conn, zones=None, delay=0.12, verbose=True):
     if not locs:
         return {"geocoded": 0, "in_zone": 0, "failed": 0}
 
-    # contexto/bias por localidad (uso el de la primera zona que la incluya)
-    ctx_by_loc = {}
-    for z in zones:
-        for l in z.get("geocode_localidades", []):
-            ctx_by_loc.setdefault(l, (z.get("geocode_context", "Buenos Aires"),
-                                      z.get("geocode_bias")))
-
-    default_ctx = (zones[0].get("geocode_context", "Buenos Aires"),
-                   zones[0].get("geocode_bias")) if zones else ("Buenos Aires", None)
+    bias = zones[0].get("geocode_bias") if zones else None
 
     placeholders = ",".join("?" for _ in locs)
     # Geolocalizamos: (a) propiedades de ArgenProp en las localidades de interés,
     # y (b) propiedades de otras fuentes (RE/MAX, Tokko) que llegan ya filtradas a
     # la zona y traen dirección pero no coordenadas.
     rows = conn.execute(
-        f"SELECT uid, address, json_extract(raw,'$.idlocalidad') idl, source "
+        f"SELECT uid, address, json_extract(raw,'$.idlocalidad') idl, source, "
+        f"json_extract(raw,'$.locality') rawloc "
         f"FROM listings WHERE geocoded IS NULL AND ("
         f"json_extract(raw,'$.idlocalidad') IN ({placeholders}) "
         f"OR source <> 'argenprop')",
@@ -114,8 +121,14 @@ def enrich(conn, zones=None, delay=0.12, verbose=True):
     geocoded = failed = in_zone = 0
     try:
         for i, r in enumerate(rows):
-            ctx, bias = ctx_by_loc.get(str(r["idl"]), default_ctx)
-            coord = geocode(r["address"], context=ctx, bias=bias, client=client)
+            # Usamos la localidad REAL del aviso como contexto. Así una "Acevedo
+            # 2744" de Remedios de Escalada se ubica en Remedios (afuera), y no
+            # en la Acevedo de Banfield por forzar el contexto.
+            loc = localidad_de(r["source"], r["idl"], r["rawloc"])
+            ctx = f"{loc}, Buenos Aires"
+            # el sesgo al centro de la zona solo tiene sentido si es Banfield
+            b = bias if "banfield" in loc.lower() else None
+            coord = geocode(r["address"], context=ctx, bias=b, client=client)
             if coord:
                 lat, lon = coord
                 names = zones_for_point(lat, lon, zones)
