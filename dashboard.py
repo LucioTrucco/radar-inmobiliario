@@ -98,7 +98,7 @@ DATA = {
 }
 
 HTML = r"""
-<!DOCTYPE html><html lang="es" data-theme="tintado" data-accent="cobalto" data-shape="suave"><head><meta charset="utf-8">
+<!DOCTYPE html><html lang="es" data-theme="oscuro" data-accent="grafito" data-shape="suave"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -133,18 +133,7 @@ button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 .skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--bg);padding:10px 16px;z-index:50;font-weight:600}
 .skip:focus{left:16px;top:16px}
 .wrap{max-width:1080px;margin:0 auto;padding:0 var(--pad) 96px}
-/* ---- selector de temas ---- */
-.themebar{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding:16px 0 6px;
-  font-size:var(--t-xs);color:var(--ink-2)}
-.tb-note{font-weight:600;margin-right:2px}
-.tb-group{display:inline-flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
-.tb-group button{padding:6px 13px;border-radius:999px;font-size:var(--t-xs);font-weight:600;color:var(--ink-2);min-height:32px;transition:color .15s var(--ease),background .15s var(--ease)}
-.tb-group button:hover{color:var(--ink)}
-.tb-group button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
-#accentpick button{padding:5px;width:32px;display:grid;place-items:center}
-#accentpick i{width:16px;height:16px;border-radius:999px;display:block;box-shadow:inset 0 0 0 1px rgba(128,128,128,.4)}
-#accentpick button[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--ink)}
-header{position:sticky;top:0;z-index:var(--z-sticky);background:var(--bg);padding:22px 0 0;
+header{position:sticky;top:0;z-index:var(--z-sticky);background:var(--bg);padding:30px 0 0;
   transition:background .2s var(--ease)}
 .htop{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
 h1{font-size:var(--t-lg);font-weight:800;letter-spacing:-.03em;text-wrap:balance}
@@ -235,22 +224,6 @@ select:focus{border-color:var(--accent)}
 </style></head><body>
 <a class="skip" href="#main">Saltar al contenido</a>
 <div class="wrap">
-<div class="themebar" role="group" aria-label="Apariencia">
-  <span class="tb-note">Probá un tema:</span>
-  <div class="tb-group" id="themepick" role="group" aria-label="Tema">
-    <button data-th="claro">Claro</button><button data-th="tintado">Tintado</button>
-    <button data-th="oscuro">Oscuro</button><button data-th="color">Color</button>
-  </div>
-  <div class="tb-group" id="accentpick" role="group" aria-label="Acento">
-    <button data-ac="cobalto" aria-label="Cobalto"><i style="background:#2f5bd0"></i></button>
-    <button data-ac="pino" aria-label="Pino"><i style="background:#1f6b4a"></i></button>
-    <button data-ac="bordo" aria-label="Bordó"><i style="background:#9a2f3a"></i></button>
-    <button data-ac="grafito" aria-label="Grafito, sin acento"><i style="background:#5b6068"></i></button>
-  </div>
-  <div class="tb-group" id="shapepick" role="group" aria-label="Forma">
-    <button data-sh="suave">Suave</button><button data-sh="recto">Recto</button>
-  </div>
-</div>
 <header>
  <div class="htop"><h1>Radar Inmobiliario</h1><span class="upd" id="upd"></span></div>
  <p class="summary" id="summary"></p>
@@ -365,21 +338,6 @@ zc.querySelectorAll("button").forEach(b=>b.onclick=()=>{st.zone=zopts[b.dataset.
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;
   document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));render();});
 
-// ---- selector de temas (persistente) ----
-const root=document.documentElement;
-let TH="tintado", AC="cobalto", SH="suave";
-try{ TH=localStorage.getItem("radar-th")||TH; AC=localStorage.getItem("radar-ac")||AC; SH=localStorage.getItem("radar-sh")||SH; }catch(e){}
-function applyTheme(){
- root.setAttribute("data-theme",TH); root.setAttribute("data-accent",AC); root.setAttribute("data-shape",SH);
- document.querySelectorAll("#themepick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.th===TH));
- document.querySelectorAll("#accentpick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.ac===AC));
- document.querySelectorAll("#shapepick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.sh===SH));
- try{ localStorage.setItem("radar-th",TH); localStorage.setItem("radar-ac",AC); localStorage.setItem("radar-sh",SH); }catch(e){}
-}
-document.querySelectorAll("#themepick button").forEach(b=>b.onclick=()=>{TH=b.dataset.th;applyTheme();});
-document.querySelectorAll("#accentpick button").forEach(b=>b.onclick=()=>{AC=b.dataset.ac;applyTheme();});
-document.querySelectorAll("#shapepick button").forEach(b=>b.onclick=()=>{SH=b.dataset.sh;applyTheme();});
-applyTheme();
 render();
 </script></body></html>
 """
