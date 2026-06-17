@@ -8,3 +8,4 @@ zone_polygon.json
 # NOTA: data/radar.db SÍ se versiona a propósito: es la "memoria" del radar.
 # GitHub Actions la actualiza en cada corrida y el dashboard la lee.
 inside_zone.json
+.claude/
