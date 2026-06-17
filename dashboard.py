@@ -2,7 +2,8 @@
 Dashboard web del radar inmobiliario.
 
 Streamlit oficia solo de host: carga los datos de la base y renderiza una
-interfaz propia (HTML/CSS/JS a medida). Registro product, identidad monocromo.
+interfaz propia (HTML/CSS/JS a medida). Registro product, identidad monocromo
+con sistema de temas conmutable (claro/tintado/oscuro/color × 4 acentos).
 Sistema de diseño: design-system/MASTER.md.
 
 Correr local:   streamlit run dashboard.py
@@ -28,7 +29,6 @@ st.markdown("""<style>
 [data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"] {display:none !important;}
 .block-container {padding:0 !important; max-width:100% !important;}
 [data-testid="stAppViewContainer"]>.main {padding:0;}
-[data-testid="stApp"], body {background:#fff;}
 iframe {border:none;}
 </style>""", unsafe_allow_html=True)
 
@@ -98,85 +98,91 @@ DATA = {
 }
 
 HTML = r"""
-<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<!DOCTYPE html><html lang="es" data-theme="tintado" data-accent="cobalto"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Hanken+Grotesk:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
-  --bg:#fff; --surface:#f6f6f7; --ink:#14171a; --ink-2:#555a61; --line:#e7e8eb;
-  --rule:#14171a; --focus:#14171a;
   --t-xs:.75rem; --t-sm:.8125rem; --t-base:1rem; --t-md:1.0625rem; --t-lg:1.5rem;
-  --ease:cubic-bezier(.16,1,.3,1); --z-sticky:10;
+  --ease:cubic-bezier(.16,1,.3,1); --z-sticky:10; --pad:28px;
+  --accent:var(--accent-l);
 }
+/* ---- acentos ---- */
+:root[data-accent=cobalto]{--accent-l:#2f5bd0;--accent-d:#83a8ff;--accent-on:#fff}
+:root[data-accent=pino]{--accent-l:#1f6b4a;--accent-d:#56b88c;--accent-on:#fff}
+:root[data-accent=bordo]{--accent-l:#9a2f3a;--accent-d:#e98a92;--accent-on:#fff}
+:root[data-accent=grafito]{--accent-l:var(--ink);--accent-d:var(--ink);--accent-on:var(--bg)}
+/* ---- temas ---- */
+:root[data-theme=claro]{--bg:#fff;--surface:#f5f6f7;--ink:#14171a;--ink-2:#555a61;--line:#e7e8eb;--rule:#14171a;--focus:var(--accent)}
+:root[data-theme=tintado]{--bg:#eef0f4;--surface:#fff;--ink:#16191d;--ink-2:#525862;--line:#dde0e6;--rule:#16191d;--focus:var(--accent)}
+:root[data-theme=oscuro]{--bg:#0e0f12;--surface:#181b21;--ink:#e9ebee;--ink-2:#a3a9b1;--line:#262a31;--rule:#e9ebee;--focus:var(--accent);--accent:var(--accent-d)}
+:root[data-theme=color]{--bg:#fff;--surface:#f5f6f7;--ink:#14171a;--ink-2:#555a61;--line:#e7e8eb;--rule:transparent;--focus:var(--accent)}
 *{box-sizing:border-box;margin:0;padding:0}
 html{font-size:100%}
 body{background:var(--bg);color:var(--ink);
   font-family:"Hanken Grotesk",system-ui,-apple-system,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
   font-size:var(--t-base);line-height:1.5;-webkit-font-smoothing:antialiased;
-  font-kerning:normal;text-rendering:optimizeLegibility}
+  font-kerning:normal;text-rendering:optimizeLegibility;transition:background .2s var(--ease),color .2s var(--ease)}
 .tnum{font-variant-numeric:tabular-nums}
 a{color:inherit;text-decoration:none}
 button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
 :focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:3px}
-::selection{background:var(--ink);color:#fff}
-.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:#fff;
-  padding:10px 16px;z-index:50;font-weight:600}
+::selection{background:var(--accent);color:var(--accent-on)}
+.skip{position:absolute;left:-9999px;top:0;background:var(--ink);color:var(--bg);padding:10px 16px;z-index:50;font-weight:600}
 .skip:focus{left:16px;top:16px}
-.wrap{max-width:1080px;margin:0 auto;padding:0 28px 96px}
-header{position:sticky;top:0;z-index:var(--z-sticky);background:var(--bg);padding:30px 0 0}
+.wrap{max-width:1080px;margin:0 auto;padding:0 var(--pad) 96px}
+/* ---- selector de temas ---- */
+.themebar{display:flex;align-items:center;gap:10px 14px;flex-wrap:wrap;padding:16px 0 6px;
+  font-size:var(--t-xs);color:var(--ink-2)}
+.tb-note{font-weight:600;margin-right:2px}
+.tb-group{display:inline-flex;gap:3px;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:3px}
+.tb-group button{padding:6px 13px;border-radius:999px;font-size:var(--t-xs);font-weight:600;color:var(--ink-2);min-height:32px;transition:color .15s var(--ease),background .15s var(--ease)}
+.tb-group button:hover{color:var(--ink)}
+.tb-group button[aria-pressed=true]{background:var(--bg);color:var(--ink);box-shadow:inset 0 0 0 1px var(--line)}
+#accentpick button{padding:5px;width:32px;display:grid;place-items:center}
+#accentpick i{width:16px;height:16px;border-radius:999px;display:block;box-shadow:inset 0 0 0 1px rgba(128,128,128,.4)}
+#accentpick button[aria-pressed=true]{box-shadow:inset 0 0 0 2px var(--ink)}
+header{position:sticky;top:0;z-index:var(--z-sticky);background:var(--bg);padding:22px 0 0;
+  transition:background .2s var(--ease)}
 .htop{display:flex;justify-content:space-between;align-items:baseline;gap:16px;flex-wrap:wrap}
-h1{font-size:var(--t-lg);font-weight:800;letter-spacing:-.03em}
+h1{font-size:var(--t-lg);font-weight:800;letter-spacing:-.03em;text-wrap:balance}
 .upd{color:var(--ink-2);font-size:var(--t-xs);white-space:nowrap}
-.summary{color:var(--ink-2);font-size:var(--t-md);margin-top:10px;max-width:60ch;
-  text-wrap:pretty;line-height:1.45}
+.summary{color:var(--ink-2);font-size:var(--t-md);margin-top:10px;max-width:60ch;text-wrap:pretty;line-height:1.45}
 .summary b{color:var(--ink);font-weight:700}
 .zones{display:flex;gap:22px;margin-top:18px}
-.zones button{font-size:var(--t-sm);font-weight:600;color:var(--ink-2);padding:2px 0;
-  border-bottom:2px solid transparent;transition:color .15s var(--ease)}
+.zones button{font-size:var(--t-sm);font-weight:600;color:var(--ink-2);padding:2px 0;border-bottom:2px solid transparent;transition:color .15s var(--ease)}
 .zones button:hover{color:var(--ink)}
-.zones button[aria-pressed="true"]{color:var(--ink);border-color:var(--ink)}
+.zones button[aria-pressed=true]{color:var(--accent);border-color:var(--accent)}
 .rule{height:2px;background:var(--rule);margin-top:14px}
 nav{display:flex;gap:30px;border-bottom:1px solid var(--line)}
-nav button{font-size:var(--t-md);font-weight:600;color:var(--ink-2);padding:14px 0;
-  margin-bottom:-1px;border-bottom:2px solid transparent;transition:color .15s var(--ease)}
+nav button{font-size:var(--t-md);font-weight:600;color:var(--ink-2);padding:14px 0;margin-bottom:-1px;border-bottom:2px solid transparent;transition:color .15s var(--ease)}
 nav button:hover{color:var(--ink)}
-nav button[aria-selected="true"]{color:var(--ink);border-color:var(--ink);font-weight:700}
-main{display:block}
+nav button[aria-selected=true]{color:var(--accent);border-color:var(--accent);font-weight:700}
 .controls{display:flex;gap:14px 22px;flex-wrap:wrap;align-items:center;margin:26px 0 6px}
 .search{flex:1;min-width:230px}
-.search input{width:100%;border:0;border-bottom:1.5px solid var(--line);background:none;
-  outline:0;color:var(--ink);padding:9px 0;font-size:var(--t-base);font-family:inherit;
-  transition:border-color .15s var(--ease)}
+.search input{width:100%;border:0;border-bottom:1.5px solid var(--line);background:none;outline:0;color:var(--ink);padding:9px 0;font-size:var(--t-base);font-family:inherit;transition:border-color .15s var(--ease)}
 .search input::placeholder{color:var(--ink-2)}
-.search input:focus{border-color:var(--ink)}
+.search input:focus{border-color:var(--accent)}
 .toggles{display:flex;gap:8px;flex-wrap:wrap}
-.chip{border:1px solid var(--ink);color:var(--ink);padding:7px 15px;border-radius:999px;
-  font-size:var(--t-sm);font-weight:600;transition:background .15s var(--ease),color .15s var(--ease);min-height:36px}
-.chip:hover{background:var(--surface)}
-.chip[aria-pressed="true"]{background:var(--ink);color:#fff}
-.chip[aria-pressed="true"]:hover{background:#000}
-.sortwrap{position:relative;display:flex;align-items:center;gap:6px}
-select{border:0;border-bottom:1.5px solid var(--line);background:none;color:var(--ink);
-  padding:9px 22px 9px 0;font-size:var(--t-sm);font-weight:600;font-family:inherit;
-  -webkit-appearance:none;appearance:none;cursor:pointer}
-select:focus{border-color:var(--ink)}
-.sortwrap::after{content:"";position:absolute;right:6px;top:50%;width:7px;height:7px;
-  border-right:1.5px solid var(--ink-2);border-bottom:1.5px solid var(--ink-2);
-  transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.chip{border:1px solid var(--line);color:var(--ink);padding:7px 15px;border-radius:999px;font-size:var(--t-sm);font-weight:600;min-height:36px;transition:background .15s var(--ease),color .15s var(--ease),border-color .15s var(--ease)}
+.chip:hover{border-color:var(--ink-2)}
+.chip[aria-pressed=true]{background:var(--accent);color:var(--accent-on);border-color:var(--accent)}
+.sortwrap{position:relative;display:flex;align-items:center}
+select{border:0;border-bottom:1.5px solid var(--line);background:none;color:var(--ink);padding:9px 22px 9px 0;font-size:var(--t-sm);font-weight:600;font-family:inherit;-webkit-appearance:none;appearance:none;cursor:pointer}
+select:focus{border-color:var(--accent)}
+.sortwrap::after{content:"";position:absolute;right:6px;top:50%;width:7px;height:7px;border-right:1.5px solid var(--ink-2);border-bottom:1.5px solid var(--ink-2);transform:translateY(-70%) rotate(45deg);pointer-events:none}
 .count{color:var(--ink-2);font-size:var(--t-sm);margin:18px 0 2px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 44px}
-@media(max-width:680px){.grid{grid-template-columns:1fr}.wrap{padding:0 20px 80px}
-  header{padding-top:22px}}
-.item{display:block;border-top:1px solid var(--line);padding:18px 14px;margin:0 -14px;
-  transition:background .15s var(--ease)}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.wrap{padding:0 20px 80px;--pad:20px}}
+.item{display:block;border-top:1px solid var(--line);padding:18px 14px;margin:0 -14px;transition:background .15s var(--ease)}
 .item:hover{background:var(--surface)}
 .item .price{font-size:var(--t-lg);font-weight:800;letter-spacing:-.02em;line-height:1.05}
 .item .addr{font-size:var(--t-md);font-weight:600;margin-top:8px}
 .item .meta{color:var(--ink-2);font-size:var(--t-sm);margin-top:5px}
 .item .foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:13px}
-.item .cta{font-size:var(--t-sm);font-weight:600}
+.item .cta{font-size:var(--t-sm);font-weight:600;color:var(--accent)}
 .item .cta .arr{display:inline-block;transition:transform .15s var(--ease)}
 .item:hover .cta .arr{transform:translateX(3px)}
 .item:hover .cta{text-decoration:underline;text-underline-offset:3px}
@@ -189,23 +195,43 @@ select:focus{border-color:var(--ink)}
 .ev .t{font-weight:600;font-size:var(--t-md);margin-top:7px}
 .ev .strike{text-decoration:line-through;color:var(--ink-2)}
 .ev .efoot{color:var(--ink-2);font-size:var(--t-sm);margin-top:8px}
-.ev .efoot a{font-weight:600;color:var(--ink)}
+.ev .efoot a{font-weight:600;color:var(--accent)}
 .ev .efoot a:hover{text-decoration:underline;text-underline-offset:3px}
-.more{display:block;width:100%;margin:30px 0 0;padding:15px;border-top:1.5px solid var(--ink);
-  border-bottom:1.5px solid var(--ink);color:var(--ink);font-weight:700;font-size:var(--t-sm);
-  transition:background .15s var(--ease)}
+.more{display:block;width:100%;margin:30px 0 0;padding:15px;border-top:1.5px solid var(--ink);border-bottom:1.5px solid var(--ink);color:var(--ink);font-weight:700;font-size:var(--t-sm);transition:background .15s var(--ease)}
 .more:hover{background:var(--surface)}
 .empty{border-top:1px solid var(--line);padding:60px 0 20px;color:var(--ink-2);max-width:46ch}
 .empty b{color:var(--ink);font-weight:700;display:block;margin-bottom:6px;font-size:var(--t-md)}
-.agrow{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:18px;
-  border-top:1px solid var(--line);padding:15px 0}
+.agrow{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:18px;border-top:1px solid var(--line);padding:15px 0}
 .agrow .nm{font-weight:600;font-size:var(--t-md)}
 .agrow .sub{color:var(--ink-2);font-size:var(--t-sm);margin-top:2px}
 .agrow .n{font-weight:800;font-size:var(--t-lg);letter-spacing:-.02em}
+/* ---- tema "color": franja de header con el acento ---- */
+:root[data-theme=color] header{background:var(--accent);margin:0 calc(-1*var(--pad));padding:22px var(--pad) 0}
+:root[data-theme=color] header h1,:root[data-theme=color] header .summary b,:root[data-theme=color] header .upd{color:var(--accent-on)}
+:root[data-theme=color] header .summary{color:var(--accent-on);opacity:.88}
+:root[data-theme=color] .zones button{color:rgba(255,255,255,.72)}
+:root[data-theme=color] .zones button[aria-pressed=true]{color:#fff;border-color:#fff}
+:root[data-theme=color] nav{border-bottom-color:rgba(255,255,255,.28)}
+:root[data-theme=color] nav button{color:rgba(255,255,255,.72)}
+:root[data-theme=color] nav button[aria-selected=true]{color:#fff;border-color:#fff}
+:root[data-theme=color][data-accent=grafito] .zones button,:root[data-theme=color][data-accent=grafito] nav button{color:rgba(255,255,255,.72)}
 @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style></head><body>
 <a class="skip" href="#main">Saltar al contenido</a>
 <div class="wrap">
+<div class="themebar" role="group" aria-label="Apariencia">
+  <span class="tb-note">Probá un tema:</span>
+  <div class="tb-group" id="themepick" role="group" aria-label="Tema">
+    <button data-th="claro">Claro</button><button data-th="tintado">Tintado</button>
+    <button data-th="oscuro">Oscuro</button><button data-th="color">Color</button>
+  </div>
+  <div class="tb-group" id="accentpick" role="group" aria-label="Acento">
+    <button data-ac="cobalto" aria-label="Cobalto"><i style="background:#2f5bd0"></i></button>
+    <button data-ac="pino" aria-label="Pino"><i style="background:#1f6b4a"></i></button>
+    <button data-ac="bordo" aria-label="Bordó"><i style="background:#9a2f3a"></i></button>
+    <button data-ac="grafito" aria-label="Grafito, sin acento"><i style="background:#5b6068"></i></button>
+  </div>
+</div>
 <header>
  <div class="htop"><h1>Radar Inmobiliario</h1><span class="upd" id="upd"></span></div>
  <p class="summary" id="summary"></p>
@@ -272,7 +298,7 @@ function viewProps(){ const a=fListings(); const v=a.slice(0,st.show);
    <div class="sortwrap"><select id="sort" aria-label="Ordenar">
      <option value="recent">Más recientes</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option></select></div>
  </div><p class="count">${a.length} ${a.length==1?"casa":"casas"}${st.srcs.size||st.q?" · filtrado":""}</p>`;
- if(!a.length) return h+`<div class="empty"><b>No hay casas con esos filtros.</b>Probá quitar un filtro o cambiar la búsqueda. Si la fuente está apagada, encendela en los chips de arriba.</div>`;
+ if(!a.length) return h+`<div class="empty"><b>No hay casas con esos filtros.</b>Probá quitar un filtro o cambiar la búsqueda. Si una fuente está apagada, encendela en los chips de arriba.</div>`;
  h += `<div class="grid">${v.map(item).join("")}</div>`;
  if(a.length>st.show) h+=`<button class="more" id="more">Ver ${Math.min(24,a.length-st.show)} más · quedan ${a.length-st.show}</button>`;
  return h; }
@@ -319,6 +345,20 @@ zc.querySelectorAll("button").forEach(b=>b.onclick=()=>{st.zone=zopts[b.dataset.
   zc.querySelectorAll("button").forEach(x=>x.setAttribute("aria-pressed", x===b));render();});
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;
   document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected", x===b));render();});
+
+// ---- selector de temas (persistente) ----
+const root=document.documentElement;
+let TH="tintado", AC="cobalto";
+try{ TH=localStorage.getItem("radar-th")||TH; AC=localStorage.getItem("radar-ac")||AC; }catch(e){}
+function applyTheme(){
+ root.setAttribute("data-theme",TH); root.setAttribute("data-accent",AC);
+ document.querySelectorAll("#themepick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.th===TH));
+ document.querySelectorAll("#accentpick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.ac===AC));
+ try{ localStorage.setItem("radar-th",TH); localStorage.setItem("radar-ac",AC); }catch(e){}
+}
+document.querySelectorAll("#themepick button").forEach(b=>b.onclick=()=>{TH=b.dataset.th;applyTheme();});
+document.querySelectorAll("#accentpick button").forEach(b=>b.onclick=()=>{AC=b.dataset.ac;applyTheme();});
+applyTheme();
 render();
 </script></body></html>
 """
