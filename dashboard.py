@@ -1,8 +1,11 @@
 """
 Dashboard web del radar inmobiliario.
 
+Streamlit se usa solo como "host": carga los datos de la base y renderiza una
+interfaz propia (HTML/CSS/JS a medida) con control total del diseño.
+
 Correr local:   streamlit run dashboard.py
-En la nube:     se publica en Streamlit Community Cloud.
+En la nube:     Streamlit Community Cloud.
 """
 import json
 import sqlite3
@@ -11,281 +14,257 @@ from pathlib import Path
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 
 import config
 
 DB_PATH = Path(__file__).parent / "data" / "radar.db"
 AR_TZ = timezone(timedelta(hours=-3))
-MESES = ["ene", "feb", "mar", "abr", "may", "jun",
-         "jul", "ago", "sep", "oct", "nov", "dic"]
 
-st.set_page_config(page_title="Radar Inmobiliario — Banfield/Lomas",
-                   page_icon="🏠", layout="wide")
-
-st.markdown("""
-<style>
-#MainMenu, footer, header[data-testid="stHeader"] {visibility: hidden;}
-.block-container {padding-top: 1.4rem; padding-bottom: 3rem; max-width: 1080px;}
-h1 {font-size: 1.7rem !important; font-weight: 600;}
-[data-testid="stMetric"] {background: var(--secondary-background-color);
-   border-radius: 12px; padding: 14px 18px;}
-[data-testid="stMetricValue"] {font-size: 1.5rem; font-weight: 600;}
-[data-testid="stMetricLabel"] {opacity: .8;}
-/* tarjetas */
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-tag) {
-   border-radius: 14px; transition: border-color .15s; }
-div[data-testid="stVerticalBlockBorderWrapper"]:has(.card-tag):hover {
-   border-color: rgba(128,128,128,.5); }
-.price {font-size: 1.35rem; font-weight: 700; line-height: 1.1;}
-.addr {opacity: .85; font-size: .95rem;}
-.muted {opacity: .6; font-size: .82rem;}
-.tag {display:inline-block; padding: 1px 9px; border-radius: 20px;
-   font-size: .72rem; font-weight: 600; letter-spacing:.02em;}
-a.verlink {text-decoration: none; font-weight: 600; font-size: .85rem;}
-.stTabs [data-baseweb="tab-list"] {gap: 4px;}
-.stTabs [data-baseweb="tab"] {font-size: 1rem; padding: 8px 14px;}
-</style>
-""", unsafe_allow_html=True)
+st.set_page_config(page_title="Radar Inmobiliario", page_icon="🏠", layout="wide")
+st.markdown("""<style>
+#MainMenu, footer, header[data-testid="stHeader"] {display:none;}
+.block-container {padding:0 !important; max-width:100% !important;}
+[data-testid="stAppViewContainer"]>.main {padding:0;}
+iframe {border:none;}
+</style>""", unsafe_allow_html=True)
 
 
 @st.cache_data(ttl=60)
-def load(query, params=()):
+def load(query):
     if not DB_PATH.exists():
         return pd.DataFrame()
     con = sqlite3.connect(DB_PATH)
     try:
-        return pd.read_sql_query(query, con, params=params)
+        return pd.read_sql_query(query, con)
     finally:
         con.close()
 
 
-def _dt(iso):
-    if not iso or pd.isna(iso):
+def to_iso_ar(iso):
+    if not iso:
         return None
     try:
         d = datetime.fromisoformat(str(iso))
-        return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).astimezone(AR_TZ)
+        d = d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+        return d.astimezone(AR_TZ).isoformat()
     except Exception:
         return None
 
 
-def fecha(iso):
-    d = _dt(iso)
-    return f"{d.day} {MESES[d.month - 1]} {d.year}" if d else "—"
-
-
-def relativo(iso):
-    d = _dt(iso)
-    if not d:
-        return ""
-    s = (datetime.now(AR_TZ) - d).total_seconds()
-    if s < 0:
-        return "recién"
-    if s < 3600:
-        return f"hace {max(1, int(s // 60))} min"
-    if s < 86400:
-        return f"hace {int(s // 3600)} h"
-    días = int(s // 86400)
-    return "ayer" if días == 1 else (f"hace {días} días" if días < 30 else fecha(iso))
-
-
-def plata(price, currency):
-    if price is None or pd.isna(price):
-        return "Consultar"
-    return f"{currency} {int(price):,}".replace(",", ".")
-
-
-SRC = {"argenprop": ("ArgenProp", "#185FA5", "#E6F1FB"),
-       "remax": ("RE/MAX", "#A32D2D", "#FCEBEB"),
-       "tokko": ("Inmobiliaria", "#534AB7", "#EEEDFE")}
-
-
-def tag(text, fg, bg):
-    return f"<span class='tag' style='color:{fg};background:{bg}'>{text}</span>"
-
-
-# ---------- carga ----------
 if not DB_PATH.exists():
-    st.title("🏠 Radar Inmobiliario")
-    st.warning("Todavía no hay datos. Corré `python run.py` primero.")
+    st.error("Todavía no hay datos. Corré `python run.py` primero.")
     st.stop()
 
-listings = load("SELECT * FROM listings WHERE active = 1")
-events = load("SELECT e.*, l.zones AS l_zones FROM events e "
-              "LEFT JOIN listings l ON e.uid = l.uid ORDER BY e.created_at DESC")
-agencies = load("SELECT * FROM agencies ORDER BY first_seen DESC")
-runs = load("SELECT * FROM runs ORDER BY id DESC LIMIT 1")
+listings = load("SELECT price,currency,address,bedrooms,source,agency_name,url,"
+                "first_seen,zones,title FROM listings WHERE active=1")
+events = load("SELECT e.type,e.title,e.detail,e.created_at, l.zones AS l_zones "
+              "FROM events e LEFT JOIN listings l ON e.uid=l.uid "
+              "ORDER BY e.created_at DESC LIMIT 400")
+runs = load("SELECT finished_at FROM runs ORDER BY id DESC LIMIT 1")
 
 
-def in_zone(zones_json, zone_name):
-    if not zones_json:
-        return False
+def jz(s):
     try:
-        return zone_name in json.loads(zones_json)
+        return json.loads(s) if s else []
     except Exception:
-        return False
+        return []
 
 
-st.title("🏠 Radar Inmobiliario")
-última = runs.iloc[0]["finished_at"] if not runs.empty else None
+L = [{
+    "price": None if pd.isna(r.price) else float(r.price),
+    "cur": r.currency, "addr": r.address or "", "beds": None if pd.isna(r.bedrooms) else int(r.bedrooms),
+    "src": r.source, "ag": None if pd.isna(r.agency_name) else r.agency_name,
+    "url": r.url, "ts": to_iso_ar(r.first_seen), "zones": jz(r.zones),
+} for r in listings.itertuples()]
 
-# ---------- selector de zona (vista principal) ----------
-zone_names = [z["name"].split(" (")[0] for z in config.WATCH_ZONES]
-zone_full = {z["name"].split(" (")[0]: z["name"] for z in config.WATCH_ZONES}
-opciones_zona = zone_names + ["Toda la zona"]
-zsel = st.segmented_control("Zona", opciones_zona, default=zone_names[0],
-                            label_visibility="collapsed")
-zsel = zsel or "Toda la zona"
-zone_active = zone_full.get(zsel)
+E = []
+for r in events.itertuples():
+    d = json.loads(r.detail) if r.detail else {}
+    E.append({"type": r.type, "title": r.title or "", "ts": to_iso_ar(r.created_at),
+              "zones": jz(r.l_zones), "price": d.get("price"), "cur": d.get("currency"),
+              "old": d.get("old_price"), "new": d.get("new_price"),
+              "addr": d.get("address"), "url": d.get("url")})
 
-if zone_active:
-    listings = listings[listings["zones"].apply(lambda z: in_zone(z, zone_active))]
-    events = events[events["l_zones"].apply(lambda z: in_zone(z, zone_active))]
-
-st.caption(f"📍 {zsel}  ·  actualizado {relativo(última)}")
-
-c1, c2, c3 = st.columns(3)
-c1.metric("Casas activas", len(listings))
-c2.metric("Inmobiliarias", listings["agency_id"].nunique() if not listings.empty else 0)
-nuevas_7d = 0
-if not events.empty:
-    lim = datetime.now(AR_TZ) - timedelta(days=7)
-    nuevas_7d = sum(1 for x in events["created_at"]
-                    if (_dt(x) or datetime.now(AR_TZ)) >= lim)
-c3.metric("Novedades (7 días)", nuevas_7d)
-
-st.write("")
-tab1, tab2, tab3 = st.tabs(["🏘️ Propiedades", "🔔 Novedades", "🏢 Inmobiliarias"])
-
-EVENTOS = {
-    "propiedad_nueva":        ("🆕", "Nueva",            "#3B6D11", "#EAF3DE"),
-    "baja_precio":            ("📉", "Bajó de precio",   "#185FA5", "#E6F1FB"),
-    "suba_precio":            ("📈", "Subió de precio",  "#854F0B", "#FAEEDA"),
-    "inmobiliaria_nueva":     ("🏢", "Inmobiliaria nueva", "#534AB7", "#EEEDFE"),
-    "propiedad_dada_de_baja": ("❌", "Dada de baja",     "#5F5E5A", "#F1EFE8"),
+DATA = {
+    "listings": L, "events": E,
+    "zones": [z["name"] for z in config.WATCH_ZONES],
+    "zoneShort": [z["name"].split(" (")[0] for z in config.WATCH_ZONES],
+    "updated": to_iso_ar(runs.iloc[0]["finished_at"]) if not runs.empty else None,
 }
 
-# ============ PROPIEDADES ============
-with tab1:
-    if listings.empty:
-        st.info("No hay casas en esta vista.")
-    else:
-        with st.container(border=False):
-            cc = st.columns([3, 1.3, 1.3, 1.6])
-            buscar = cc[0].text_input("Buscar", "", placeholder="🔎 calle, barrio…",
-                                      label_visibility="collapsed")
-            fopts = sorted(listings["source"].dropna().unique().tolist())
-            fsel = cc[1].multiselect("Fuente", fopts,
-                                     format_func=lambda s: SRC.get(s, (s,))[0],
-                                     placeholder="Fuente", label_visibility="collapsed")
-            msel = cc[2].multiselect("Moneda", ["USD", "ARS"],
-                                     placeholder="Moneda", label_visibility="collapsed")
-            orden = cc[3].selectbox("Orden", ["Más recientes", "Menor precio", "Mayor precio"],
-                                    label_visibility="collapsed")
+HTML = r"""
+<!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+:root{
+  --bg:#f4f5f7; --card:#fff; --text:#16191f; --muted:#6b7280; --line:#e7e9ee;
+  --accent:#2563eb; --accentBg:#eaf0fe; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05);
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0f1115; --card:#181b22; --text:#e8eaed; --muted:#9aa1ad; --line:#272b34;
+  --accent:#6ea8fe; --accentBg:#1b2740; --shadow:0 1px 3px rgba(0,0,0,.4);}}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; font-size:15px;}
+.wrap{max-width:1080px; margin:0 auto; padding:0 16px 60px;}
+header{position:sticky;top:0;z-index:20;background:var(--bg);padding:18px 0 10px;border-bottom:1px solid var(--line)}
+.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
+.upd{color:var(--muted);font-size:.8rem;margin-left:auto}
+.stats{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 14px;box-shadow:var(--shadow)}
+.stat b{font-size:1.15rem;display:block}.stat span{color:var(--muted);font-size:.75rem}
+.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-top:12px}
+.seg button{border:0;background:transparent;color:var(--muted);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600}
+.seg button.on{background:var(--accent);color:#fff}
+nav{display:flex;gap:4px;margin-top:14px}
+nav button{border:0;background:transparent;color:var(--muted);padding:9px 4px;margin-right:18px;cursor:pointer;font-size:1rem;font-weight:600;border-bottom:2.5px solid transparent}
+nav button.on{color:var(--text);border-color:var(--accent)}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0}
+.search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;box-shadow:var(--shadow)}
+.search input{border:0;outline:0;background:transparent;color:var(--text);width:100%;font-size:.92rem}
+.chip{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:.82rem;font-weight:600}
+.chip.on{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
+select{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;padding:8px 12px;font-size:.85rem;cursor:pointer}
+.count{color:var(--muted);font-size:.82rem;margin-bottom:10px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
+.card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(16,24,40,.10)}
+.crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
+.price{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
+.badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
+.addr{margin-top:8px;font-size:.95rem;font-weight:600}
+.meta{color:var(--muted);font-size:.82rem;margin-top:3px}
+.cfoot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
+.cfoot a{color:var(--accent);text-decoration:none;font-weight:700;font-size:.85rem}
+.cfoot span{color:var(--muted);font-size:.78rem}
+.ev{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
+.ev .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.ev .t{font-weight:700;margin-top:6px}
+.ev .strike{text-decoration:line-through;color:var(--muted)}
+.more{display:block;width:100%;margin:18px 0;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--accent);font-weight:700;cursor:pointer;font-size:.9rem}
+.empty{text-align:center;color:var(--muted);padding:50px 20px}
+.agrow{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
+.agrow .nm{font-weight:600;flex:1}
+.bar{height:7px;border-radius:6px;background:var(--accent);min-width:7px}
+.barwrap{width:130px;background:var(--line);border-radius:6px;overflow:hidden}
+</style></head><body><div class="wrap">
+<header>
+ <div class="brand"><h1>🏠 Radar Inmobiliario</h1><div class="upd" id="upd"></div></div>
+ <div class="seg" id="zoneseg"></div>
+ <nav id="tabs">
+   <button data-tab="props" class="on">Propiedades</button>
+   <button data-tab="news">Novedades</button>
+   <button data-tab="ag">Inmobiliarias</button>
+ </nav>
+</header>
+<div class="stats" id="stats"></div>
+<div id="view"></div>
+</div>
+<script>
+const D = __DATA__;
+const SRC = {argenprop:["ArgenProp","#1d4ed8","#e7eefe"], remax:["RE/MAX","#b91c1c","#fde8e8"], tokko:["Inmobiliaria","#6d28d9","#efe9fd"]};
+const EV = {
+ propiedad_nueva:["🆕 Nueva","#15803d"], baja_precio:["📉 Bajó de precio","#1d4ed8"],
+ suba_precio:["📈 Subió","#b45309"], inmobiliaria_nueva:["🏢 Inmobiliaria nueva","#6d28d9"],
+ propiedad_dada_de_baja:["❌ Dada de baja","#6b7280"]};
+const st = {zone: D.zones[0]||null, tab:"props", q:"", srcs:new Set(), sort:"recent", types:new Set(), show:24};
 
-        df = listings.copy()
-        if buscar:
-            m = (df["address"].fillna("").str.contains(buscar, case=False)
-                 | df["title"].fillna("").str.contains(buscar, case=False))
-            df = df[m]
-        if fsel:
-            df = df[df["source"].isin(fsel)]
-        if msel:
-            df = df[df["currency"].isin(msel)]
+function money(p,c){ if(p==null) return "Consultar"; return (c||"")+" "+Math.round(p).toLocaleString("es-AR"); }
+function rel(iso){ if(!iso) return ""; const d=new Date(iso), s=(Date.now()-d)/1000;
+ if(s<0) return "recién"; if(s<3600) return "hace "+Math.max(1,Math.floor(s/60))+" min";
+ if(s<86400) return "hace "+Math.floor(s/3600)+" h"; const dd=Math.floor(s/86400);
+ if(dd==1) return "ayer"; if(dd<30) return "hace "+dd+" días";
+ return d.toLocaleDateString("es-AR",{day:"numeric",month:"short"}); }
+function inZone(zones){ return st.zone? (zones||[]).includes(st.zone) : true; }
 
-        if orden == "Más recientes":
-            df = df.sort_values("first_seen", ascending=False)
-        else:
-            df = df.sort_values("price", ascending=(orden == "Menor precio"),
-                                na_position="last")
+function fListings(){ let a=D.listings.filter(x=>inZone(x.zones));
+ if(st.q){const q=st.q.toLowerCase(); a=a.filter(x=>(x.addr+" "+(x.title||"")+" "+(x.ag||"")).toLowerCase().includes(q));}
+ if(st.srcs.size) a=a.filter(x=>st.srcs.has(x.src));
+ if(st.sort=="recent") a.sort((p,q)=>(q.ts||"").localeCompare(p.ts||""));
+ else a.sort((p,q)=>{const pv=p.price??1e15,qv=q.price??1e15; return st.sort=="asc"?pv-qv:qv-pv;});
+ return a; }
+function fEvents(){ let a=D.events.filter(x=>inZone(x.zones));
+ if(st.types.size) a=a.filter(x=>st.types.has(x.type)); return a.slice(0,200); }
 
-        total = len(df)
-        if "n_show" not in st.session_state:
-            st.session_state.n_show = 24
-        n = min(st.session_state.n_show, total)
-        st.caption(f"Mostrando {n} de {total} casas")
+function renderStats(){ const ls=D.listings.filter(x=>inZone(x.zones));
+ const ags=new Set(ls.map(x=>x.ag||x.src+"?")).size;
+ const wk=Date.now()-7*864e5; const nw=D.events.filter(x=>inZone(x.zones)&&new Date(x.ts)>=wk).length;
+ document.getElementById("stats").innerHTML =
+  `<div class="stat"><b>${ls.length}</b><span>casas activas</span></div>
+   <div class="stat"><b>${ags}</b><span>inmobiliarias</span></div>
+   <div class="stat"><b>${nw}</b><span>novedades · 7 días</span></div>`; }
 
-        cols = st.columns(3)
-        for i, (_, r) in enumerate(df.head(n).iterrows()):
-            nombre, fg, bg = SRC.get(r["source"], (r["source"], "#444", "#eee"))
-            with cols[i % 3].container(border=True):
-                st.markdown(
-                    f"<span class='card-tag'></span>"
-                    f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                    f"<span class='price'>{plata(r['price'], r['currency'])}</span>"
-                    f"{tag(nombre, fg, bg)}</div>", unsafe_allow_html=True)
-                amb = f"🛏 {int(r['bedrooms'])} amb · " if pd.notna(r["bedrooms"]) and r["bedrooms"] else ""
-                inmo = r["agency_name"] if pd.notna(r["agency_name"]) else ""
-                st.markdown(f"<div class='addr'>📍 {r['address'] or '—'}</div>"
-                            f"<div class='muted'>{amb}{inmo}</div>", unsafe_allow_html=True)
-                st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                    f"<a class='verlink' href='{r['url']}' target='_blank'>Ver aviso ↗</a>"
-                    f"<span class='muted'>{relativo(r['first_seen'])}</span></div>",
-                    unsafe_allow_html=True)
+function card(x){ const s=SRC[x.src]||[x.src,"#555","#eee"];
+ return `<div class="card"><div class="crow"><div class="price">${money(x.price,x.cur)}</div>
+   <span class="badge" style="color:${s[1]};background:${s[2]}">${s[0]}</span></div>
+   <div class="addr">📍 ${x.addr||"—"}</div>
+   <div class="meta">${x.beds?("🛏 "+x.beds+" amb"):""}${x.beds&&x.ag?" · ":""}${x.ag||""}</div>
+   <div class="cfoot"><a href="${x.url}" target="_blank" rel="noopener">Ver aviso ↗</a><span>${rel(x.ts)}</span></div></div>`; }
 
-        if total > n:
-            if st.button(f"Ver más  ({total - n} restantes)", use_container_width=True):
-                st.session_state.n_show += 24
-                st.rerun()
+function viewProps(){ const a=fListings(); const v=a.slice(0,st.show);
+ const chips=Object.keys(SRC).map(k=>`<span class="chip ${st.srcs.has(k)?'on':''}" data-src="${k}">${SRC[k][0]}</span>`).join("");
+ let h=`<div class="controls">
+   <div class="search">🔎<input id="q" placeholder="Buscar por calle, barrio o inmobiliaria…" value="${st.q.replace(/"/g,'&quot;')}"></div>
+   ${chips}
+   <select id="sort"><option value="recent">Más recientes</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option></select>
+ </div><div class="count">${a.length} casas${st.srcs.size||st.q?" (filtrado)":""}</div>`;
+ h += a.length? `<div class="grid">${v.map(card).join("")}</div>` : `<div class="empty">No hay casas con esos filtros.</div>`;
+ if(a.length>st.show) h+=`<button class="more" id="more">Ver más (${a.length-st.show} restantes)</button>`;
+ return h; }
 
-# ============ NOVEDADES ============
-with tab2:
-    if events.empty:
-        st.info("Sin novedades todavía. Cuando aparezca algo nuevo, lo vas a ver acá.")
-    else:
-        sel = st.pills("Tipo", list(EVENTOS.keys()), selection_mode="multi",
-                       format_func=lambda k: f"{EVENTOS[k][0]} {EVENTOS[k][1]}",
-                       label_visibility="collapsed")
-        ev = events[events["type"].isin(sel)] if sel else events
-        ev = ev.head(200)
-        st.caption(f"{len(ev)} novedades" + ("" if sel else "  ·  todas"))
+function viewNews(){ const a=fEvents();
+ const chips=Object.keys(EV).map(k=>`<span class="chip ${st.types.has(k)?'on':''}" data-type="${k}">${EV[k][0]}</span>`).join("");
+ let h=`<div class="controls">${chips}</div><div class="count">${a.length} novedades${st.types.size?" (filtrado)":" · todas"}</div>`;
+ if(!a.length) return h+`<div class="empty">Sin novedades en esta vista.</div>`;
+ h+=a.map(x=>{const e=EV[x.type]||["•","#666"]; let body="";
+   if(x.type=="baja_precio"||x.type=="suba_precio") body=`<span class="strike">${money(x.old,x.cur)}</span> &nbsp;<b>${money(x.new,x.cur)}</b>`;
+   else if(x.price!=null) body=`<b>${money(x.price,x.cur)}</b>`;
+   const foot=[x.addr?("📍 "+x.addr):"", x.url?`<a href="${x.url}" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:none">Ver aviso ↗</a>`:""].filter(Boolean).join(" · ");
+   return `<div class="ev" style="border-left-color:${e[1]}"><div class="top"><b style="color:${e[1]}">${e[0]}</b><span style="color:var(--muted);font-size:.8rem">${rel(x.ts)}</span></div>
+    <div class="t">${x.title||"Propiedad"}</div>${body?`<div style="margin-top:4px">${body}</div>`:""}
+    ${foot?`<div class="meta" style="margin-top:6px">${foot}</div>`:""}</div>`;}).join("");
+ return h; }
 
-        for _, r in ev.iterrows():
-            d = json.loads(r["detail"]) if r["detail"] else {}
-            ic, nom, fg, bg = EVENTOS.get(r["type"], ("•", r["type"], "#444", "#eee"))
-            with st.container(border=True):
-                st.markdown(
-                    f"<div style='display:flex;justify-content:space-between;align-items:center'>"
-                    f"{tag(ic + ' ' + nom, fg, bg)}"
-                    f"<span class='muted'>{relativo(r['created_at'])}</span></div>"
-                    f"<div style='font-weight:600;margin-top:4px'>{r['title'] or 'Propiedad'}</div>",
-                    unsafe_allow_html=True)
-                if r["type"] in ("baja_precio", "suba_precio"):
-                    st.markdown(f"<span class='muted' style='text-decoration:line-through'>"
-                                f"{plata(d.get('old_price'), d.get('currency',''))}</span> &nbsp;"
-                                f"<b>{plata(d.get('new_price'), d.get('currency',''))}</b>",
-                                unsafe_allow_html=True)
-                elif d.get("price"):
-                    st.markdown(f"<b>{plata(d.get('price'), d.get('currency',''))}</b>",
-                                unsafe_allow_html=True)
-                bits = []
-                if d.get("address"):
-                    bits.append(f"📍 {d['address']}")
-                if d.get("url"):
-                    bits.append(f"<a class='verlink' href='{d['url']}' target='_blank'>Ver aviso ↗</a>")
-                if bits:
-                    st.markdown(f"<div class='muted'>{'  ·  '.join(bits)}</div>",
-                                unsafe_allow_html=True)
+function viewAg(){ const ls=D.listings.filter(x=>inZone(x.zones)); const m={};
+ ls.forEach(x=>{const k=(x.ag||"(sin nombre)")+"||"+x.src; m[k]=(m[k]||0)+1;});
+ const rows=Object.entries(m).map(([k,n])=>({nm:k.split("||")[0],src:k.split("||")[1],n})).sort((a,b)=>b.n-a.n);
+ const mx=rows.length?rows[0].n:1;
+ let h=`<div class="count">${rows.length} inmobiliarias con casas en esta vista</div>`;
+ h+=rows.map(r=>{const s=SRC[r.src]||[r.src,"#555","#eee"];
+   return `<div class="agrow"><span class="nm">${r.nm}</span>
+    <span class="badge" style="color:${s[1]};background:${s[2]}">${s[0]}</span>
+    <div class="barwrap"><div class="bar" style="width:${Math.round(r.n/mx*100)}%"></div></div>
+    <b style="width:28px;text-align:right">${r.n}</b></div>`;}).join("");
+ return h; }
 
-# ============ INMOBILIARIAS ============
-with tab3:
-    if agencies.empty:
-        st.info("Sin inmobiliarias.")
-    else:
-        counts = listings.groupby("agency_id").size().rename("Casas")
-        ag = agencies.merge(counts, left_on="agency_id", right_index=True, how="left")
-        ag["Casas"] = ag["Casas"].fillna(0).astype(int)
-        if zone_active:
-            ag = ag[ag["Casas"] > 0]
-        ag["Inmobiliaria"] = ag["name"].fillna("(sin nombre)")
-        ag["Fuente"] = ag["source"].map(lambda s: SRC.get(s, (s,))[0])
-        ag = ag.sort_values("Casas", ascending=False)
-        st.caption(f"{len(ag)} inmobiliarias con casas en esta vista")
-        st.dataframe(
-            ag[["Inmobiliaria", "Fuente", "Casas"]],
-            hide_index=True, use_container_width=True, height=560,
-            column_config={"Casas": st.column_config.ProgressColumn(
-                "Casas", format="%d", min_value=0,
-                max_value=int(ag["Casas"].max() or 1))},
-        )
+function render(){
+ document.getElementById("upd").textContent = D.updated? "actualizado "+rel(D.updated):"";
+ renderStats();
+ const v=document.getElementById("view");
+ v.innerHTML = st.tab=="props"?viewProps(): st.tab=="news"?viewNews(): viewAg();
+ wire();
+}
+function wire(){
+ const q=document.getElementById("q"); if(q) q.oninput=e=>{st.q=e.target.value;st.show=24;const p=e.target.selectionStart;render();const n=document.getElementById("q");if(n){n.focus();n.setSelectionRange(p,p);}};
+ const so=document.getElementById("sort"); if(so){so.value=st.sort;so.onchange=e=>{st.sort=e.target.value;render();};}
+ const mo=document.getElementById("more"); if(mo) mo.onclick=()=>{st.show+=24;render();};
+ document.querySelectorAll("[data-src]").forEach(c=>c.onclick=()=>{const k=c.dataset.src;st.srcs.has(k)?st.srcs.delete(k):st.srcs.add(k);st.show=24;render();});
+ document.querySelectorAll("[data-type]").forEach(c=>c.onclick=()=>{const k=c.dataset.type;st.types.has(k)?st.types.delete(k):st.types.add(k);render();});
+}
+// zona
+const zs=document.getElementById("zoneseg");
+const zopts=[...D.zoneShort.map((s,i)=>({lbl:s,val:D.zones[i]})),{lbl:"Toda la zona",val:null}];
+zs.innerHTML=zopts.map((o,i)=>`<button data-z="${i}" class="${(o.val===st.zone)?'on':''}">${o.lbl}</button>`).join("");
+zs.querySelectorAll("button").forEach(b=>b.onclick=()=>{st.zone=zopts[b.dataset.z].val;st.show=24;
+  zs.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();});
+// tabs
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;
+  document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();});
+render();
+</script></body></html>
+"""
+
+components.html(HTML.replace("__DATA__", json.dumps(DATA, ensure_ascii=False)),
+                height=1400, scrolling=True)
