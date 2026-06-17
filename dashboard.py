@@ -98,7 +98,7 @@ DATA = {
 }
 
 HTML = r"""
-<!DOCTYPE html><html lang="es" data-theme="tintado" data-accent="cobalto"><head><meta charset="utf-8">
+<!DOCTYPE html><html lang="es" data-theme="tintado" data-accent="cobalto" data-shape="suave"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -215,7 +215,23 @@ select:focus{border-color:var(--accent)}
 :root[data-theme=color] nav button{color:rgba(255,255,255,.72)}
 :root[data-theme=color] nav button[aria-selected=true]{color:#fff;border-color:#fff}
 :root[data-theme=color][data-accent=grafito] .zones button,:root[data-theme=color][data-accent=grafito] nav button{color:rgba(255,255,255,.72)}
-@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+/* ---- forma "suave": tarjetas blandas redondeadas, menos rejilla dura ---- */
+:root[data-shape=suave] .grid{gap:12px}
+:root[data-shape=suave] .item{border-top:0;background:var(--surface);border-radius:16px;padding:18px 20px;margin:0;
+  box-shadow:0 1px 2px rgba(20,23,26,.04)}
+:root[data-shape=suave] .item:hover{background:var(--surface);transform:translateY(-2px);box-shadow:0 8px 24px rgba(20,23,26,.09)}
+:root[data-shape=suave] .search input{border:1px solid var(--line);border-radius:14px;background:var(--surface);padding:12px 16px}
+:root[data-shape=suave] .search input:focus{border-color:var(--accent)}
+:root[data-shape=suave] .ev{border-top:0;background:var(--surface);border-radius:16px;padding:16px 20px;margin-bottom:10px;
+  box-shadow:0 1px 2px rgba(20,23,26,.04)}
+:root[data-shape=suave] .ev:first-child{border-top:0}
+:root[data-shape=suave] .agrow{border-top:0;background:var(--surface);border-radius:14px;padding:14px 18px;margin-bottom:8px}
+:root[data-shape=suave] .more{border:1px solid var(--line);border-radius:14px}
+:root[data-theme=oscuro][data-shape=suave] .item,:root[data-theme=oscuro][data-shape=suave] .ev,
+:root[data-theme=oscuro][data-shape=suave] .agrow{box-shadow:none;border:1px solid var(--line)}
+:root[data-theme=claro][data-shape=suave] .item,:root[data-theme=claro][data-shape=suave] .ev{box-shadow:0 1px 3px rgba(20,23,26,.05)}
+@media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}
+  :root[data-shape=suave] .item:hover{transform:none}}
 </style></head><body>
 <a class="skip" href="#main">Saltar al contenido</a>
 <div class="wrap">
@@ -230,6 +246,9 @@ select:focus{border-color:var(--accent)}
     <button data-ac="pino" aria-label="Pino"><i style="background:#1f6b4a"></i></button>
     <button data-ac="bordo" aria-label="Bordó"><i style="background:#9a2f3a"></i></button>
     <button data-ac="grafito" aria-label="Grafito, sin acento"><i style="background:#5b6068"></i></button>
+  </div>
+  <div class="tb-group" id="shapepick" role="group" aria-label="Forma">
+    <button data-sh="suave">Suave</button><button data-sh="recto">Recto</button>
   </div>
 </div>
 <header>
@@ -348,16 +367,18 @@ document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{st.tab=b.dat
 
 // ---- selector de temas (persistente) ----
 const root=document.documentElement;
-let TH="tintado", AC="cobalto";
-try{ TH=localStorage.getItem("radar-th")||TH; AC=localStorage.getItem("radar-ac")||AC; }catch(e){}
+let TH="tintado", AC="cobalto", SH="suave";
+try{ TH=localStorage.getItem("radar-th")||TH; AC=localStorage.getItem("radar-ac")||AC; SH=localStorage.getItem("radar-sh")||SH; }catch(e){}
 function applyTheme(){
- root.setAttribute("data-theme",TH); root.setAttribute("data-accent",AC);
+ root.setAttribute("data-theme",TH); root.setAttribute("data-accent",AC); root.setAttribute("data-shape",SH);
  document.querySelectorAll("#themepick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.th===TH));
  document.querySelectorAll("#accentpick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.ac===AC));
- try{ localStorage.setItem("radar-th",TH); localStorage.setItem("radar-ac",AC); }catch(e){}
+ document.querySelectorAll("#shapepick button").forEach(b=>b.setAttribute("aria-pressed", b.dataset.sh===SH));
+ try{ localStorage.setItem("radar-th",TH); localStorage.setItem("radar-ac",AC); localStorage.setItem("radar-sh",SH); }catch(e){}
 }
 document.querySelectorAll("#themepick button").forEach(b=>b.onclick=()=>{TH=b.dataset.th;applyTheme();});
 document.querySelectorAll("#accentpick button").forEach(b=>b.onclick=()=>{AC=b.dataset.ac;applyTheme();});
+document.querySelectorAll("#shapepick button").forEach(b=>b.onclick=()=>{SH=b.dataset.sh;applyTheme();});
 applyTheme();
 render();
 </script></body></html>
