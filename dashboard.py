@@ -162,6 +162,13 @@ nav button[aria-selected=true]{color:var(--accent);border-color:var(--accent);fo
 select{border:0;border-bottom:1.5px solid var(--line);background:none;color:var(--ink);padding:9px 22px 9px 0;font-size:var(--t-sm);font-weight:600;font-family:inherit;-webkit-appearance:none;appearance:none;cursor:pointer}
 select:focus{border-color:var(--accent)}
 .sortwrap::after{content:"";position:absolute;right:6px;top:50%;width:7px;height:7px;border-right:1.5px solid var(--ink-2);border-bottom:1.5px solid var(--ink-2);transform:translateY(-70%) rotate(45deg);pointer-events:none}
+.barrow{display:flex;justify-content:space-between;align-items:center;gap:14px 28px;flex-wrap:wrap;margin-top:16px}
+.sortbar{display:flex;align-items:center;gap:2px}
+.sortbar .lbl{font-size:var(--t-sm);color:var(--ink-2);margin-right:8px}
+.sortbar button{padding:5px 11px;border-radius:999px;font-size:var(--t-sm);font-weight:600;color:var(--ink-2);
+  transition:color .15s var(--ease),background .15s var(--ease)}
+.sortbar button:hover{color:var(--ink)}
+.sortbar button[aria-pressed=true]{color:var(--accent-on);background:var(--accent)}
 .count{color:var(--ink-2);font-size:var(--t-sm);margin:18px 0 2px}
 .grid{display:grid;grid-template-columns:1fr 1fr;gap:0 44px}
 @media(max-width:680px){.grid{grid-template-columns:1fr}.wrap{padding:0 20px 80px;--pad:20px}}
@@ -284,11 +291,15 @@ function item(x){ const meta=[x.beds?(x.beds+" amb"):"", x.ag||"", SRC[x.src]||x
 
 function viewProps(){ const a=fListings(); const v=a.slice(0,st.show);
  const ch=Object.keys(SRC).map(k=>`<button class="chip" data-src="${k}" aria-pressed="${st.srcs.has(k)}">${SRC[k]}</button>`).join("");
+ const so=(v,l)=>`<button data-sort="${v}" aria-pressed="${st.sort==v}">${l}</button>`;
  let h=`<div class="controls">
    <div class="search"><input id="q" type="search" aria-label="Buscar por calle, barrio o inmobiliaria" placeholder="Buscar por calle, barrio o inmobiliaria" value="${esc(st.q)}"></div>
+ </div>
+ <div class="barrow">
    <div class="toggles" role="group" aria-label="Filtrar por fuente">${ch}</div>
-   <div class="sortwrap"><select id="sort" aria-label="Ordenar">
-     <option value="recent">Más recientes</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option></select></div>
+   <div class="sortbar" role="group" aria-label="Ordenar por">
+     <span class="lbl">Ordenar</span>${so("recent","Recientes")}${so("asc","Menor precio")}${so("desc","Mayor precio")}
+   </div>
  </div><p class="count">${a.length} ${a.length==1?"casa":"casas"}${st.srcs.size||st.q?" · filtrado":""}</p>`;
  if(!a.length) return h+`<div class="empty"><b>No hay casas con esos filtros.</b>Probá quitar un filtro o cambiar la búsqueda. Si una fuente está apagada, encendela en los chips de arriba.</div>`;
  h += `<div class="grid">${v.map(item).join("")}</div>`;
@@ -325,7 +336,7 @@ function render(){
 }
 function wire(){
  const q=document.getElementById("q"); if(q) q.oninput=e=>{st.q=e.target.value;st.show=24;const p=e.target.selectionStart;render();const n=document.getElementById("q");if(n){n.focus();n.setSelectionRange(p,p);}};
- const so=document.getElementById("sort"); if(so){so.value=st.sort;so.onchange=e=>{st.sort=e.target.value;render();};}
+ document.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{st.sort=b.dataset.sort;render();});
  const mo=document.getElementById("more"); if(mo) mo.onclick=()=>{st.show+=24;render();};
  document.querySelectorAll("[data-src]").forEach(c=>c.onclick=()=>{const k=c.dataset.src;st.srcs.has(k)?st.srcs.delete(k):st.srcs.add(k);st.show=24;render();});
  document.querySelectorAll("[data-type]").forEach(c=>c.onclick=()=>{const k=c.dataset.type;st.types.has(k)?st.types.delete(k):st.types.add(k);render();});
