@@ -29,10 +29,23 @@ para correr **todos los días a las 8:00 (hora Argentina)**.
 
 Cada vez que el robot actualiza la base, el dashboard se actualiza solo.
 
+## Parte 3 — ArgenProp desde tu compu
+
+ArgenProp bloquea los servidores de la nube (error 403), pero **desde tu casa
+funciona perfecto**. Por eso, cuando quieras refrescar ArgenProp:
+
+👉 **Doble clic en el archivo `actualizar.command`** (en la carpeta del proyecto).
+
+Eso trae lo último de la nube, busca novedades en TODAS las fuentes (ArgenProp +
+RE/MAX + Tokko) y vuelve a subir todo. El dashboard se actualiza solo después.
+
+Mientras tanto, la nube sigue refrescando RE/MAX y las inmobiliarias Tokko todos
+los días por su cuenta, aunque tu compu esté apagada.
+
 ## ¿Y ZonaProp?
 
 Queda como próximo paso: necesita un navegador automatizado (headless) que sortee
-su bloqueo. Se monta sobre este mismo esquema de GitHub Actions.
+su bloqueo. Se monta sobre este mismo esquema.
 
 ## Notas
 
