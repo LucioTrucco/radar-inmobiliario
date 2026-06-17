@@ -22,6 +22,10 @@ HEADERS = {
 }
 
 
+def _tipo(it):
+    return ((it.get("type") or {}).get("value") or "").lower()
+
+
 def _parse(it, zone_name):
     cur = (it.get("currency") or {}).get("value") or "?"
     assoc = it.get("associate") or {}
@@ -44,14 +48,15 @@ def _parse(it, zone_name):
         lat=lat,
         lon=lon,
         raw={"geoLabel": it.get("geoLabel"), "internalId": it.get("internalId"),
-             "bathrooms": it.get("bathrooms")},
+             "bathrooms": it.get("bathrooms"), "tipo": _tipo(it)},
     )
 
 
 def scrape_location(location_code, location_name, zone_name,
                     operation_id=1, page_size=50, max_pages=20,
-                    delay=0.4, client=None):
-    """operation_id: 1=venta, 2=alquiler. Recorre todas las páginas de la API."""
+                    delay=0.4, client=None, solo_casas=True):
+    """operation_id: 1=venta, 2=alquiler. Recorre todas las páginas de la API.
+    Con solo_casas=True descarta departamentos, PH, terrenos, etc."""
     own = client is None
     if own:
         client = httpx.Client(headers=HEADERS, timeout=40, follow_redirects=True)
@@ -72,6 +77,8 @@ def scrape_location(location_code, location_name, zone_name,
             if not items:
                 break
             for it in items:
+                if solo_casas and _tipo(it) != "casa":
+                    continue
                 listings.append(_parse(it, zone_name))
             total_pages = data.get("totalPages", 0)
             print(f"  [remax] {location_name} pág {page + 1}/{total_pages}: "

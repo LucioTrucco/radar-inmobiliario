@@ -44,10 +44,11 @@ def _parse_card(cont, base_url, agency_name):
         price = float(pm.group(2).replace(".", ""))
 
     # tipo / operación / localidad + dirección: están en los segmentos previos al precio
-    operation, locality, address = "", "", ""
+    tipo, operation, locality, address = "", "", "", ""
     for i, seg in enumerate(parts):
         tm = TYPEOP_RE.search(seg)
         if tm:
+            tipo = tm.group(1).strip().lower()
             operation = tm.group(2).lower()
             locality = tm.group(3).split(",")[0].strip()
             if i + 1 < len(parts):
@@ -58,18 +59,18 @@ def _parse_card(cont, base_url, agency_name):
         source=f"tokko",
         source_id=f"{agency_name}:{sid}",
         url=base_url.rstrip("/") + href if href.startswith("/") else href,
-        title=f"{operation.title()} en {locality}".strip() or "Propiedad",
+        title=f"{tipo.title()} en {locality}".strip() or "Propiedad",
         address=address,
         price=price,
         currency=currency,
         agency_id=agency_name,
         agency_name=agency_name,
-        raw={"locality": locality, "operation": operation},
-    ), operation
+        raw={"locality": locality, "operation": operation, "tipo": tipo},
+    ), operation, tipo
 
 
 def scrape_site(base_url, agency_name, listing_path="/Venta",
-                only_operation="venta", client=None):
+                only_operation="venta", solo_casas=True, client=None):
     """Lee las propiedades de la página principal de listados de un sitio Tokko."""
     own = client is None
     if own:
@@ -93,10 +94,12 @@ def scrape_site(base_url, agency_name, listing_path="/Venta",
             res = _parse_card(cont, base_url, agency_name)
             if not res:
                 continue
-            lst, op = res
+            lst, op, tipo = res
             if lst.source_id in seen:
                 continue
             if only_operation and op and only_operation not in op:
+                continue
+            if solo_casas and tipo and "casa" not in tipo:
                 continue
             seen.add(lst.source_id)
             listings.append(lst)
