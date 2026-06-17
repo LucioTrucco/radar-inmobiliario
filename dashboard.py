@@ -3,6 +3,7 @@ Dashboard web del radar inmobiliario.
 
 Streamlit se usa solo como "host": carga los datos de la base y renderiza una
 interfaz propia (HTML/CSS/JS a medida) con control total del diseño.
+Estética: minimalista monocromo (blanco/negro, tipografía fuerte, grilla).
 
 Correr local:   streamlit run dashboard.py
 En la nube:     Streamlit Community Cloud.
@@ -23,9 +24,11 @@ AR_TZ = timezone(timedelta(hours=-3))
 
 st.set_page_config(page_title="Radar Inmobiliario", page_icon="🏠", layout="wide")
 st.markdown("""<style>
-#MainMenu, footer, header[data-testid="stHeader"] {display:none;}
+#MainMenu, footer, header[data-testid="stHeader"],
+[data-testid="stDecoration"], [data-testid="stToolbar"], [data-testid="stStatusWidget"] {display:none !important;}
 .block-container {padding:0 !important; max-width:100% !important;}
 [data-testid="stAppViewContainer"]>.main {padding:0;}
+[data-testid="stApp"] {background:#fff;}
 iframe {border:none;}
 </style>""", unsafe_allow_html=True)
 
@@ -73,7 +76,8 @@ def jz(s):
 
 L = [{
     "price": None if pd.isna(r.price) else float(r.price),
-    "cur": r.currency, "addr": r.address or "", "beds": None if pd.isna(r.bedrooms) else int(r.bedrooms),
+    "cur": r.currency, "addr": r.address or "",
+    "beds": None if pd.isna(r.bedrooms) else int(r.bedrooms),
     "src": r.source, "ag": None if pd.isna(r.agency_name) else r.agency_name,
     "url": r.url, "ts": to_iso_ar(r.first_seen), "zones": jz(r.zones),
 } for r in listings.itertuples()]
@@ -97,62 +101,75 @@ HTML = r"""
 <!DOCTYPE html><html lang="es"><head><meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-:root{
-  --bg:#f4f5f7; --card:#fff; --text:#16191f; --muted:#6b7280; --line:#e7e9ee;
-  --accent:#2563eb; --accentBg:#eaf0fe; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05);
-}
-@media (prefers-color-scheme: dark){:root{
-  --bg:#0f1115; --card:#181b22; --text:#e8eaed; --muted:#9aa1ad; --line:#272b34;
-  --accent:#6ea8fe; --accentBg:#1b2740; --shadow:0 1px 3px rgba(0,0,0,.4);}}
+:root{ --ink:#0a0a0a; --gray:#8a8a8a; --line:#e2e2e2; --rule:#0a0a0a; }
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
-  background:var(--bg); color:var(--text); -webkit-font-smoothing:antialiased; font-size:15px;}
-.wrap{max-width:1080px; margin:0 auto; padding:0 16px 60px;}
-header{position:sticky;top:0;z-index:20;background:var(--bg);padding:18px 0 10px;border-bottom:1px solid var(--line)}
-.brand{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-.brand h1{font-size:1.35rem;font-weight:700;letter-spacing:-.01em}
-.upd{color:var(--muted);font-size:.8rem;margin-left:auto}
-.stats{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:8px 14px;box-shadow:var(--shadow)}
-.stat b{font-size:1.15rem;display:block}.stat span{color:var(--muted);font-size:.75rem}
-.seg{display:inline-flex;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:3px;margin-top:12px}
-.seg button{border:0;background:transparent;color:var(--muted);padding:7px 16px;border-radius:8px;cursor:pointer;font-size:.9rem;font-weight:600}
-.seg button.on{background:var(--accent);color:#fff}
-nav{display:flex;gap:4px;margin-top:14px}
-nav button{border:0;background:transparent;color:var(--muted);padding:9px 4px;margin-right:18px;cursor:pointer;font-size:1rem;font-weight:600;border-bottom:2.5px solid transparent}
-nav button.on{color:var(--text);border-color:var(--accent)}
-.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin:16px 0}
-.search{flex:1;min-width:180px;display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:9px 12px;box-shadow:var(--shadow)}
-.search input{border:0;outline:0;background:transparent;color:var(--text);width:100%;font-size:.92rem}
-.chip{border:1px solid var(--line);background:var(--card);color:var(--muted);border-radius:20px;padding:6px 13px;cursor:pointer;font-size:.82rem;font-weight:600}
-.chip.on{background:var(--accentBg);color:var(--accent);border-color:var(--accent)}
-select{border:1px solid var(--line);background:var(--card);color:var(--text);border-radius:10px;padding:8px 12px;font-size:.85rem;cursor:pointer}
-.count{color:var(--muted);font-size:.82rem;margin-bottom:10px}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(255px,1fr));gap:14px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:var(--shadow);transition:transform .12s,box-shadow .12s}
-.card:hover{transform:translateY(-2px);box-shadow:0 6px 18px rgba(16,24,40,.10)}
-.crow{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}
-.price{font-size:1.3rem;font-weight:800;letter-spacing:-.02em}
-.badge{font-size:.68rem;font-weight:700;padding:3px 9px;border-radius:20px;white-space:nowrap}
-.addr{margin-top:8px;font-size:.95rem;font-weight:600}
-.meta{color:var(--muted);font-size:.82rem;margin-top:3px}
-.cfoot{display:flex;justify-content:space-between;align-items:center;margin-top:12px;padding-top:11px;border-top:1px solid var(--line)}
-.cfoot a{color:var(--accent);text-decoration:none;font-weight:700;font-size:.85rem}
-.cfoot span{color:var(--muted);font-size:.78rem}
-.ev{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--muted);border-radius:12px;padding:14px 16px;margin-bottom:10px;box-shadow:var(--shadow)}
-.ev .top{display:flex;justify-content:space-between;align-items:center;gap:8px}
-.ev .t{font-weight:700;margin-top:6px}
-.ev .strike{text-decoration:line-through;color:var(--muted)}
-.more{display:block;width:100%;margin:18px 0;padding:12px;background:var(--card);border:1px solid var(--line);border-radius:12px;color:var(--accent);font-weight:700;cursor:pointer;font-size:.9rem}
-.empty{text-align:center;color:var(--muted);padding:50px 20px}
-.agrow{display:flex;align-items:center;gap:12px;padding:11px 4px;border-bottom:1px solid var(--line)}
-.agrow .nm{font-weight:600;flex:1}
-.bar{height:7px;border-radius:6px;background:var(--accent);min-width:7px}
-.barwrap{width:130px;background:var(--line);border-radius:6px;overflow:hidden}
+html,body{background:#fff;color:var(--ink)}
+body{font-family:"Helvetica Neue",Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;
+  font-size:15px;line-height:1.4}
+::selection{background:#0a0a0a;color:#fff}
+a{color:inherit;text-decoration:none}
+.wrap{max-width:1120px;margin:0 auto;padding:0 28px 90px}
+header{position:sticky;top:0;z-index:20;background:#fff;padding:30px 0 0}
+.htop{display:flex;justify-content:space-between;align-items:baseline}
+h1{font-size:1.45rem;font-weight:800;letter-spacing:-.01em;text-transform:uppercase}
+.upd{color:var(--gray);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em}
+.zones{display:flex;gap:24px;margin-top:6px}
+.zones button{border:0;background:none;cursor:pointer;font-size:.72rem;font-weight:700;color:var(--gray);
+  text-transform:uppercase;letter-spacing:.09em;padding:0}
+.zones button.on{color:var(--ink);text-decoration:underline;text-underline-offset:5px;text-decoration-thickness:2px}
+.rule{height:3px;background:var(--rule);margin-top:14px}
+nav{display:flex;gap:34px;border-bottom:1px solid var(--line)}
+nav button{border:0;background:none;cursor:pointer;font-size:.95rem;font-weight:700;color:var(--gray);
+  padding:14px 0;margin-bottom:-1px;border-bottom:3px solid transparent;text-transform:uppercase;letter-spacing:.04em}
+nav button.on{color:var(--ink);border-color:var(--ink)}
+.stats{display:flex;margin:26px 0 6px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}
+.stat{padding:16px 30px 16px 0;margin-right:30px}
+.stat b{font-size:2rem;font-weight:800;letter-spacing:-.03em;display:block;line-height:1}
+.stat span{color:var(--gray);font-size:.62rem;text-transform:uppercase;letter-spacing:.1em;display:block;margin-top:6px}
+.controls{display:flex;gap:14px 22px;flex-wrap:wrap;align-items:center;margin:26px 0 8px}
+.search{flex:1;min-width:220px}
+.search input{width:100%;border:0;border-bottom:2px solid var(--ink);background:none;outline:0;color:var(--ink);
+  padding:8px 0;font-size:.95rem;font-family:inherit}
+.search input::placeholder{color:var(--gray);text-transform:uppercase;letter-spacing:.07em;font-size:.76rem}
+.toggles{display:flex;gap:8px;flex-wrap:wrap}
+.chip{border:1px solid var(--ink);background:none;color:var(--ink);padding:6px 14px;cursor:pointer;
+  font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;font-family:inherit}
+.chip.on{background:var(--ink);color:#fff}
+select{border:0;border-bottom:2px solid var(--ink);background:none;color:var(--ink);padding:8px 16px 8px 0;
+  font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;cursor:pointer;font-family:inherit;
+  -webkit-appearance:none;appearance:none}
+.count{color:var(--gray);font-size:.66rem;text-transform:uppercase;letter-spacing:.1em;margin:18px 0 0}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 48px;margin-top:4px}
+@media(max-width:680px){.grid{grid-template-columns:1fr}.stat{padding-right:20px;margin-right:18px}.wrap{padding:0 18px 80px}}
+.item{border-top:1px solid var(--line);padding:20px 0}
+.item .price{font-size:1.45rem;font-weight:800;letter-spacing:-.02em;line-height:1}
+.item .addr{font-size:1.02rem;font-weight:600;margin-top:9px}
+.item .meta{color:var(--gray);font-size:.64rem;text-transform:uppercase;letter-spacing:.08em;margin-top:7px}
+.item .foot{display:flex;justify-content:space-between;align-items:baseline;margin-top:14px}
+.item .foot a{font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;
+  text-decoration:underline;text-underline-offset:3px}
+.item .foot span{color:var(--gray);font-size:.62rem;text-transform:uppercase;letter-spacing:.08em}
+.ev{border-top:1px solid var(--line);padding:18px 0}
+.ev .top{display:flex;justify-content:space-between;align-items:baseline}
+.ev .tag{font-size:.64rem;font-weight:800;text-transform:uppercase;letter-spacing:.1em}
+.ev .when{color:var(--gray);font-size:.62rem;text-transform:uppercase;letter-spacing:.08em}
+.ev .t{font-weight:600;font-size:1.05rem;margin-top:7px}
+.ev .strike{text-decoration:line-through;color:var(--gray)}
+.ev .efoot{color:var(--gray);font-size:.64rem;text-transform:uppercase;letter-spacing:.07em;margin-top:8px}
+.ev .efoot a{text-decoration:underline;text-underline-offset:3px;font-weight:700;color:var(--ink)}
+.more{display:block;width:100%;margin:32px 0 0;padding:16px;background:none;border:0;border-top:2px solid var(--ink);
+  border-bottom:2px solid var(--ink);color:var(--ink);font-weight:800;cursor:pointer;font-size:.7rem;
+  text-transform:uppercase;letter-spacing:.12em;font-family:inherit}
+.empty{color:var(--gray);padding:70px 0;font-size:.95rem;border-top:1px solid var(--line);margin-top:4px}
+.agrow{display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:18px;border-top:1px solid var(--line);padding:15px 0}
+.agrow .nm{font-weight:600;font-size:1.02rem}
+.agrow .sub{color:var(--gray);font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;margin-top:3px}
+.agrow .n{font-weight:800;font-size:1.3rem;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 </style></head><body><div class="wrap">
 <header>
- <div class="brand"><h1>🏠 Radar Inmobiliario</h1><div class="upd" id="upd"></div></div>
- <div class="seg" id="zoneseg"></div>
+ <div class="htop"><h1>Radar Inmobiliario</h1><span class="upd" id="upd"></span></div>
+ <div class="zones" id="zones"></div>
+ <div class="rule"></div>
  <nav id="tabs">
    <button data-tab="props" class="on">Propiedades</button>
    <button data-tab="news">Novedades</button>
@@ -164,20 +181,19 @@ select{border:1px solid var(--line);background:var(--card);color:var(--text);bor
 </div>
 <script>
 const D = __DATA__;
-const SRC = {argenprop:["ArgenProp","#1d4ed8","#e7eefe"], remax:["RE/MAX","#b91c1c","#fde8e8"], tokko:["Inmobiliaria","#6d28d9","#efe9fd"]};
-const EV = {
- propiedad_nueva:["🆕 Nueva","#15803d"], baja_precio:["📉 Bajó de precio","#1d4ed8"],
- suba_precio:["📈 Subió","#b45309"], inmobiliaria_nueva:["🏢 Inmobiliaria nueva","#6d28d9"],
- propiedad_dada_de_baja:["❌ Dada de baja","#6b7280"]};
+const SRC = {argenprop:"ArgenProp", remax:"RE/MAX", tokko:"Inmobiliaria"};
+const EV = {propiedad_nueva:"Nueva", baja_precio:"Bajo de precio", suba_precio:"Subio de precio",
+ inmobiliaria_nueva:"Inmobiliaria nueva", propiedad_dada_de_baja:"Dada de baja"};
 const st = {zone: D.zones[0]||null, tab:"props", q:"", srcs:new Set(), sort:"recent", types:new Set(), show:24};
 
+function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}
 function money(p,c){ if(p==null) return "Consultar"; return (c||"")+" "+Math.round(p).toLocaleString("es-AR"); }
 function rel(iso){ if(!iso) return ""; const d=new Date(iso), s=(Date.now()-d)/1000;
- if(s<0) return "recién"; if(s<3600) return "hace "+Math.max(1,Math.floor(s/60))+" min";
+ if(s<0) return "recien"; if(s<3600) return "hace "+Math.max(1,Math.floor(s/60))+" min";
  if(s<86400) return "hace "+Math.floor(s/3600)+" h"; const dd=Math.floor(s/86400);
- if(dd==1) return "ayer"; if(dd<30) return "hace "+dd+" días";
+ if(dd==1) return "ayer"; if(dd<30) return "hace "+dd+" dias";
  return d.toLocaleDateString("es-AR",{day:"numeric",month:"short"}); }
-function inZone(zones){ return st.zone? (zones||[]).includes(st.zone) : true; }
+function inZone(z){ return st.zone? (z||[]).includes(st.zone) : true; }
 
 function fListings(){ let a=D.listings.filter(x=>inZone(x.zones));
  if(st.q){const q=st.q.toLowerCase(); a=a.filter(x=>(x.addr+" "+(x.title||"")+" "+(x.ag||"")).toLowerCase().includes(q));}
@@ -192,58 +208,51 @@ function renderStats(){ const ls=D.listings.filter(x=>inZone(x.zones));
  const ags=new Set(ls.map(x=>x.ag||x.src+"?")).size;
  const wk=Date.now()-7*864e5; const nw=D.events.filter(x=>inZone(x.zones)&&new Date(x.ts)>=wk).length;
  document.getElementById("stats").innerHTML =
-  `<div class="stat"><b>${ls.length}</b><span>casas activas</span></div>
-   <div class="stat"><b>${ags}</b><span>inmobiliarias</span></div>
-   <div class="stat"><b>${nw}</b><span>novedades · 7 días</span></div>`; }
+  `<div class="stat"><b>${ls.length}</b><span>Casas activas</span></div>
+   <div class="stat"><b>${ags}</b><span>Inmobiliarias</span></div>
+   <div class="stat"><b>${nw}</b><span>Novedades / 7 dias</span></div>`; }
 
-function card(x){ const s=SRC[x.src]||[x.src,"#555","#eee"];
- return `<div class="card"><div class="crow"><div class="price">${money(x.price,x.cur)}</div>
-   <span class="badge" style="color:${s[1]};background:${s[2]}">${s[0]}</span></div>
-   <div class="addr">📍 ${x.addr||"—"}</div>
-   <div class="meta">${x.beds?("🛏 "+x.beds+" amb"):""}${x.beds&&x.ag?" · ":""}${x.ag||""}</div>
-   <div class="cfoot"><a href="${x.url}" target="_blank" rel="noopener">Ver aviso ↗</a><span>${rel(x.ts)}</span></div></div>`; }
+function item(x){ const meta=[x.beds?(x.beds+" amb"):"", x.ag||"", SRC[x.src]||x.src].filter(Boolean).join("  /  ");
+ return `<div class="item"><div class="price">${money(x.price,x.cur)}</div>
+   <div class="addr">${esc(x.addr)||"—"}</div><div class="meta">${esc(meta)}</div>
+   <div class="foot"><a href="${esc(x.url)}" target="_blank" rel="noopener">Ver aviso →</a><span>${rel(x.ts)}</span></div></div>`; }
 
 function viewProps(){ const a=fListings(); const v=a.slice(0,st.show);
- const chips=Object.keys(SRC).map(k=>`<span class="chip ${st.srcs.has(k)?'on':''}" data-src="${k}">${SRC[k][0]}</span>`).join("");
- let h=`<div class="controls">
-   <div class="search">🔎<input id="q" placeholder="Buscar por calle, barrio o inmobiliaria…" value="${st.q.replace(/"/g,'&quot;')}"></div>
-   ${chips}
-   <select id="sort"><option value="recent">Más recientes</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option></select>
- </div><div class="count">${a.length} casas${st.srcs.size||st.q?" (filtrado)":""}</div>`;
- h += a.length? `<div class="grid">${v.map(card).join("")}</div>` : `<div class="empty">No hay casas con esos filtros.</div>`;
- if(a.length>st.show) h+=`<button class="more" id="more">Ver más (${a.length-st.show} restantes)</button>`;
+ const ch=Object.keys(SRC).map(k=>`<button class="chip ${st.srcs.has(k)?'on':''}" data-src="${k}">${SRC[k]}</button>`).join("");
+ let h=`<div class="controls"><div class="search"><input id="q" placeholder="Buscar por calle, barrio o inmobiliaria" value="${esc(st.q)}"></div>
+   <div class="toggles">${ch}</div>
+   <select id="sort"><option value="recent">Mas recientes</option><option value="asc">Menor precio</option><option value="desc">Mayor precio</option></select>
+ </div><div class="count">${a.length} casas${st.srcs.size||st.q?" — filtrado":""}</div>`;
+ h += a.length? `<div class="grid">${v.map(item).join("")}</div>` : `<div class="empty">No hay casas con esos filtros.</div>`;
+ if(a.length>st.show) h+=`<button class="more" id="more">Ver mas — ${a.length-st.show} restantes</button>`;
  return h; }
 
 function viewNews(){ const a=fEvents();
- const chips=Object.keys(EV).map(k=>`<span class="chip ${st.types.has(k)?'on':''}" data-type="${k}">${EV[k][0]}</span>`).join("");
- let h=`<div class="controls">${chips}</div><div class="count">${a.length} novedades${st.types.size?" (filtrado)":" · todas"}</div>`;
+ const ch=Object.keys(EV).map(k=>`<button class="chip ${st.types.has(k)?'on':''}" data-type="${k}">${EV[k]}</button>`).join("");
+ let h=`<div class="controls"><div class="toggles">${ch}</div></div>
+   <div class="count">${a.length} novedades${st.types.size?" — filtrado":" — todas"}</div>`;
  if(!a.length) return h+`<div class="empty">Sin novedades en esta vista.</div>`;
- h+=a.map(x=>{const e=EV[x.type]||["•","#666"]; let body="";
-   if(x.type=="baja_precio"||x.type=="suba_precio") body=`<span class="strike">${money(x.old,x.cur)}</span> &nbsp;<b>${money(x.new,x.cur)}</b>`;
+ h+=`<div style="margin-top:4px">`+a.map(x=>{ let body="";
+   if(x.type=="baja_precio"||x.type=="suba_precio") body=`<span class="strike">${money(x.old,x.cur)}</span> &nbsp; <b>${money(x.new,x.cur)}</b>`;
    else if(x.price!=null) body=`<b>${money(x.price,x.cur)}</b>`;
-   const foot=[x.addr?("📍 "+x.addr):"", x.url?`<a href="${x.url}" target="_blank" style="color:var(--accent);font-weight:700;text-decoration:none">Ver aviso ↗</a>`:""].filter(Boolean).join(" · ");
-   return `<div class="ev" style="border-left-color:${e[1]}"><div class="top"><b style="color:${e[1]}">${e[0]}</b><span style="color:var(--muted);font-size:.8rem">${rel(x.ts)}</span></div>
-    <div class="t">${x.title||"Propiedad"}</div>${body?`<div style="margin-top:4px">${body}</div>`:""}
-    ${foot?`<div class="meta" style="margin-top:6px">${foot}</div>`:""}</div>`;}).join("");
+   const f=[x.addr?esc(x.addr):"", x.url?`<a href="${esc(x.url)}" target="_blank" rel="noopener">Ver aviso →</a>`:""].filter(Boolean).join("  /  ");
+   return `<div class="ev"><div class="top"><span class="tag">${EV[x.type]||x.type}</span><span class="when">${rel(x.ts)}</span></div>
+    <div class="t">${esc(x.title)||"Propiedad"}</div>${body?`<div style="margin-top:5px">${body}</div>`:""}
+    ${f?`<div class="efoot">${f}</div>`:""}</div>`;}).join("")+`</div>`;
  return h; }
 
 function viewAg(){ const ls=D.listings.filter(x=>inZone(x.zones)); const m={};
  ls.forEach(x=>{const k=(x.ag||"(sin nombre)")+"||"+x.src; m[k]=(m[k]||0)+1;});
  const rows=Object.entries(m).map(([k,n])=>({nm:k.split("||")[0],src:k.split("||")[1],n})).sort((a,b)=>b.n-a.n);
- const mx=rows.length?rows[0].n:1;
- let h=`<div class="count">${rows.length} inmobiliarias con casas en esta vista</div>`;
- h+=rows.map(r=>{const s=SRC[r.src]||[r.src,"#555","#eee"];
-   return `<div class="agrow"><span class="nm">${r.nm}</span>
-    <span class="badge" style="color:${s[1]};background:${s[2]}">${s[0]}</span>
-    <div class="barwrap"><div class="bar" style="width:${Math.round(r.n/mx*100)}%"></div></div>
-    <b style="width:28px;text-align:right">${r.n}</b></div>`;}).join("");
+ let h=`<div class="count">${rows.length} inmobiliarias con casas en esta vista</div><div style="margin-top:4px">`;
+ h+=rows.map(r=>`<div class="agrow"><div><div class="nm">${esc(r.nm)}</div><div class="sub">${SRC[r.src]||r.src}</div></div>
+    <div class="n">${r.n}</div></div>`).join("")+`</div>`;
  return h; }
 
 function render(){
- document.getElementById("upd").textContent = D.updated? "actualizado "+rel(D.updated):"";
+ document.getElementById("upd").textContent = D.updated? "Act. "+rel(D.updated):"";
  renderStats();
- const v=document.getElementById("view");
- v.innerHTML = st.tab=="props"?viewProps(): st.tab=="news"?viewNews(): viewAg();
+ document.getElementById("view").innerHTML = st.tab=="props"?viewProps(): st.tab=="news"?viewNews(): viewAg();
  wire();
 }
 function wire(){
@@ -253,13 +262,11 @@ function wire(){
  document.querySelectorAll("[data-src]").forEach(c=>c.onclick=()=>{const k=c.dataset.src;st.srcs.has(k)?st.srcs.delete(k):st.srcs.add(k);st.show=24;render();});
  document.querySelectorAll("[data-type]").forEach(c=>c.onclick=()=>{const k=c.dataset.type;st.types.has(k)?st.types.delete(k):st.types.add(k);render();});
 }
-// zona
-const zs=document.getElementById("zoneseg");
+const zc=document.getElementById("zones");
 const zopts=[...D.zoneShort.map((s,i)=>({lbl:s,val:D.zones[i]})),{lbl:"Toda la zona",val:null}];
-zs.innerHTML=zopts.map((o,i)=>`<button data-z="${i}" class="${(o.val===st.zone)?'on':''}">${o.lbl}</button>`).join("");
-zs.querySelectorAll("button").forEach(b=>b.onclick=()=>{st.zone=zopts[b.dataset.z].val;st.show=24;
-  zs.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();});
-// tabs
+zc.innerHTML=zopts.map((o,i)=>`<button data-z="${i}" class="${(o.val===st.zone)?'on':''}">${o.lbl}</button>`).join("");
+zc.querySelectorAll("button").forEach(b=>b.onclick=()=>{st.zone=zopts[b.dataset.z].val;st.show=24;
+  zc.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();});
 document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>{st.tab=b.dataset.tab;
   document.querySelectorAll("#tabs button").forEach(x=>x.classList.remove("on"));b.classList.add("on");render();});
 render();
@@ -267,4 +274,4 @@ render();
 """
 
 components.html(HTML.replace("__DATA__", json.dumps(DATA, ensure_ascii=False)),
-                height=1400, scrolling=True)
+                height=1500, scrolling=True)
