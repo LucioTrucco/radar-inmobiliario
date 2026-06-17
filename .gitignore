@@ -9,3 +9,4 @@ zone_polygon.json
 # GitHub Actions la actualiza en cada corrida y el dashboard la lee.
 inside_zone.json
 .claude/
+.agents/
