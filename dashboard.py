@@ -111,8 +111,9 @@ def in_zone(zones_json, zone_name):
 
 
 # ---------- filtro de zona (arriba) ----------
+# Por defecto se muestra TU zona delimitada (no todo Lomas), para no confundir.
 zone_names = [z["name"] for z in config.WATCH_ZONES]
-zsel = st.radio("Mostrar:", ["🌍 Toda la zona"] + zone_names, horizontal=True)
+zsel = st.radio("Mostrar:", zone_names + ["🌍 Toda la zona"], horizontal=True)
 zone_active = zsel if zsel in zone_names else None
 
 if zone_active:
