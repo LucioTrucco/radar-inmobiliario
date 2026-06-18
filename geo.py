@@ -29,6 +29,104 @@ def localidad_de(source, idlocalidad, raw_locality):
     return (raw_locality or "Banfield").strip()
 
 
+# ============================================================================
+# Geolocalización POR ALTURA usando direcciones de OpenStreetMap (Overpass).
+# Photon es solo a nivel de calle (mete una "Acevedo 2744" en la Acevedo de la
+# zona). Con las direcciones exactas de OSM interpolamos la altura sobre la calle
+# y ubicamos cada propiedad de verdad. Es lo que decide bien dentro/fuera de zona.
+# ============================================================================
+import re
+import unicodedata
+
+OVERPASS = "https://overpass-api.de/api/interpreter"
+_OSM_CACHE = {}
+
+
+def _norm(s):
+    s = unicodedata.normalize("NFKD", s or "").encode("ascii", "ignore").decode().lower()
+    s = re.sub(r"[^a-z0-9 ]", " ", s)
+    s = re.sub(r"\bgral\b", "general", s)
+    s = re.sub(r"\bav(da)?\b", "avenida", s)
+    s = re.sub(r"\b(al|n|nro|piso|pb|depto|dpto|de|del|la|las|los|el|y|e)\b", " ", s)
+    return " ".join(s.split())
+
+
+def _parse_addr(a):
+    m = re.search(r"(\d{2,5})", a or "")
+    num = int(m.group(1)) if m else None
+    street = _norm(a.split(m.group(1))[0]) if num else _norm(a)
+    return street, num
+
+
+def osm_streets(poly):
+    """Descarga (una vez) las direcciones de OSM en el área y arma un índice
+    {calle_normalizada: [(altura, lat, lon), ...]}. Devuelve (streets, centroide)."""
+    key = tuple(round(c, 3) for p in poly for c in p)
+    if key in _OSM_CACHE:
+        return _OSM_CACHE[key]
+    lats = [p[0] for p in poly]
+    lons = [p[1] for p in poly]
+    cen = (sum(lats) / len(lats), sum(lons) / len(lons))
+    S, W = min(lats) - 0.02, min(lons) - 0.02
+    N, E = max(lats) + 0.02, max(lons) + 0.02
+    q = (f'[out:json][timeout:90];'
+         f'node["addr:housenumber"]["addr:street"]({S},{W},{N},{E});out tags center;')
+    streets = {}
+    try:
+        r = httpx.post(OVERPASS, data={"data": q}, timeout=120,
+                       headers={"User-Agent": "radar-inmobiliario/1.0"})
+        from collections import defaultdict
+        acc = defaultdict(list)
+        for e in r.json().get("elements", []):
+            m = re.match(r"(\d+)", e["tags"].get("addr:housenumber", ""))
+            if not m:
+                continue
+            lat = e.get("lat") or (e.get("center") or {}).get("lat")
+            lon = e.get("lon") or (e.get("center") or {}).get("lon")
+            if lat is not None:
+                acc[_norm(e["tags"]["addr:street"])].append((int(m.group(1)), lat, lon))
+        streets = {k: sorted(v) for k, v in acc.items()}
+    except Exception as e:
+        print(f"  [osm] no se pudo bajar direcciones ({str(e)[:60]}); uso solo Photon")
+    _OSM_CACHE[key] = (streets, cen)
+    return streets, cen
+
+
+def _interp(samp, num):
+    if num <= samp[0][0]:
+        return samp[0][1], samp[0][2]
+    if num >= samp[-1][0]:
+        return samp[-1][1], samp[-1][2]
+    for i in range(len(samp) - 1):
+        if samp[i][0] <= num <= samp[i + 1][0]:
+            n0, a0, o0 = samp[i]
+            n1, a1, o1 = samp[i + 1]
+            t = (num - n0) / (n1 - n0) if n1 != n0 else 0
+            return a0 + t * (a1 - a0), o0 + t * (o1 - o0)
+    return samp[-1][1], samp[-1][2]
+
+
+def resolve_osm(address, streets, centroid):
+    """Coordenada precisa (por altura) de una dirección, o None si OSM no la tiene.
+    Ante calles homónimas, elige la instancia más cercana a la zona."""
+    st, num = _parse_addr(address)
+    if num is None or not st or not streets:
+        return None
+    toks = [t for t in st.split() if len(t) >= 4] or st.split()
+    cands = [s for s in streets if all(t in s for t in toks)]
+    if not cands:
+        cands = [s for s in streets if any((" " + t + " ") in (" " + s + " ") for t in toks)]
+    if not cands:
+        return None
+    best, bd = None, 9.0
+    for s in cands:
+        pt = _interp(streets[s], num)
+        d = (pt[0] - centroid[0]) ** 2 + (pt[1] - centroid[1]) ** 2
+        if d < bd:
+            bd, best = d, pt
+    return best
+
+
 def geocode(address, context="Buenos Aires", bias=None, client=None):
     """Devuelve (lat, lon) o None. `bias` = [lat, lon] para priorizar la zona."""
     if not address:
@@ -117,18 +215,25 @@ def enrich(conn, zones=None, delay=0.12, verbose=True):
         tuple(locs),
     ).fetchall()
 
+    # índice de direcciones de OSM (una sola descarga) para ubicar por altura
+    osm_streets_idx, osm_cen = osm_streets(zones[0]["polygon"]) if zones else ({}, (0, 0))
+
     client = httpx.Client(timeout=20, headers=HEADERS)
     geocoded = failed = in_zone = 0
     try:
         for i, r in enumerate(rows):
-            # Usamos la localidad REAL del aviso como contexto. Así una "Acevedo
-            # 2744" de Remedios de Escalada se ubica en Remedios (afuera), y no
-            # en la Acevedo de Banfield por forzar el contexto.
             loc = localidad_de(r["source"], r["idl"], r["rawloc"])
-            ctx = f"{loc}, Buenos Aires"
-            # el sesgo al centro de la zona solo tiene sentido si es Banfield
-            b = bias if "banfield" in loc.lower() else None
-            coord = geocode(r["address"], context=ctx, bias=b, client=client)
+            if "banfield" in loc.lower():
+                # En Banfield ubicamos por ALTURA con OSM (preciso). Si OSM no
+                # tiene la dirección, caemos a Photon (nivel de calle).
+                coord = (resolve_osm(r["address"], osm_streets_idx, osm_cen)
+                         or geocode(r["address"], context="Banfield, Buenos Aires",
+                                    bias=bias, client=client))
+            else:
+                # Otra localidad (Remedios, Temperley, Lomas...): Photon con su
+                # localidad real -> cae afuera de la zona, como corresponde.
+                coord = geocode(r["address"], context=f"{loc}, Buenos Aires",
+                                bias=None, client=client)
             if coord:
                 lat, lon = coord
                 names = zones_for_point(lat, lon, zones)

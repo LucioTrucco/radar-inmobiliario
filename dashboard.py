@@ -61,6 +61,12 @@ if not DB_PATH.exists():
 
 listings = load("SELECT price,currency,address,bedrooms,source,agency_name,url,"
                 "first_seen,zones,title FROM listings WHERE active=1")
+
+# Tope de precio: ocultamos las casas que cuesten más que el máximo (en USD).
+TOPE = getattr(config, "MAX_PRICE_USD", None)
+if TOPE and not listings.empty:
+    caras = (listings["currency"] == "USD") & (listings["price"] > TOPE)
+    listings = listings[~caras]
 events = load("SELECT e.type,e.title,e.detail,e.created_at, l.zones AS l_zones "
               "FROM events e LEFT JOIN listings l ON e.uid=l.uid "
               "ORDER BY e.created_at DESC LIMIT 400")
@@ -85,6 +91,9 @@ L = [{
 E = []
 for r in events.itertuples():
     d = json.loads(r.detail) if r.detail else {}
+    pr = d.get("new_price") or d.get("price")
+    if TOPE and d.get("currency") == "USD" and pr and pr > TOPE:
+        continue
     E.append({"type": r.type, "title": r.title or "", "ts": to_iso_ar(r.created_at),
               "zones": jz(r.l_zones), "price": d.get("price"), "cur": d.get("currency"),
               "old": d.get("old_price"), "new": d.get("new_price"),

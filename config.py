@@ -32,6 +32,10 @@ ZONES = [
 OPERATION = "venta"          # venta | alquiler
 PROPERTY_PATH = "casas"      # casas | departamentos | casas-y-departamentos
 
+# Precio máximo a mostrar (USD). Las casas que cuesten más NO se muestran.
+# Subilo/bajalo según tu presupuesto. None = sin tope.
+MAX_PRICE_USD = 240000
+
 # --- ZONAS DELIMITADAS (polígonos a medida) ----------------------------------
 # Marcan qué propiedades caen en un área específica definida por calles.
 # Cada propiedad de las localidades en `geocode_localidades` se geolocaliza
