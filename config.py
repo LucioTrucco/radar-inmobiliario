@@ -50,6 +50,9 @@ REMAX_LOCATIONS = [
 
 # Sitios Tokko Broker (inmobiliarias con web propia en esa plataforma).
 # Para sumar una: agregás {"name", "url"} y, si hace falta, "listing_path".
+# Portal BuscadorProp (agregador: suma casas de muchas inmobiliarias).
+BUSCADORPROP = {"enabled": True, "path": "/casas-en-venta-en-banfield"}
+
 TOKKO_SITES = [
     {"name": "Pitton", "url": "https://www.pitton.net", "listing_path": "/Venta"},
     {"name": "Pilares", "url": "https://www.pilarespropiedades.com.ar", "listing_path": "/Venta"},

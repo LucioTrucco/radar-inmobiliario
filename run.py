@@ -15,7 +15,7 @@ import config
 import geo
 import enrich
 from db import connect, process_listing, mark_delisted, now_iso
-from scrapers import argenprop, remax, tokko
+from scrapers import argenprop, remax, tokko, buscadorprop
 
 
 def run(max_pages=None):
@@ -67,6 +67,12 @@ def run(max_pages=None):
         for site in config.TOKKO_SITES:
             extra += tokko.scrape_site(site["url"], site["name"],
                                        site.get("listing_path", "/Venta"))
+        print()
+    if getattr(config, "BUSCADORPROP", {}).get("enabled"):
+        print("# Portal BuscadorProp")
+        zname = config.WATCH_ZONES[0]["name"] if config.WATCH_ZONES else "Banfield"
+        extra += buscadorprop.scrape(zname, config.BUSCADORPROP.get(
+            "path", "/casas-en-venta-en-banfield"))
         print()
 
     for lst in extra:

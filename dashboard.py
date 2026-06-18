@@ -10,6 +10,7 @@ Correr local:   streamlit run dashboard.py
 En la nube:     Streamlit Community Cloud.
 """
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone, timedelta
 from pathlib import Path
@@ -67,6 +68,26 @@ TOPE = getattr(config, "MAX_PRICE_USD", None)
 if TOPE and not listings.empty:
     caras = (listings["currency"] == "USD") & (listings["price"] > TOPE)
     listings = listings[~caras]
+
+
+# Dedup por dirección (misma casa publicada en varias fuentes / por varias
+# inmobiliarias = una sola tarjeta). Prioridad: RE/MAX (GPS) > ArgenProp > resto.
+def _addr_key(addr):
+    m = re.search(r"(\d{2,5})", addr or "")
+    if not m:
+        return None
+    street = re.sub(r"[^a-záéíóúñ]", "", addr.split(m.group(1))[0].lower())[:7]
+    return f"{street}|{m.group(1)}" if street else None
+
+
+if not listings.empty:
+    prio = {"remax": 0, "argenprop": 1, "tokko": 2, "buscadorprop": 3}
+    listings = listings.assign(
+        _p=listings["source"].map(lambda s: prio.get(s, 9)),
+        _k=listings["address"].map(_addr_key))
+    listings = listings.sort_values("_p")
+    dup = listings["_k"].notna() & listings.duplicated("_k", keep="first")
+    listings = listings[~dup].drop(columns=["_p", "_k"])
 events = load("SELECT e.type,e.title,e.detail,e.created_at, l.zones AS l_zones "
               "FROM events e LEFT JOIN listings l ON e.uid=l.uid "
               "ORDER BY e.created_at DESC LIMIT 400")
