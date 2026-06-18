@@ -289,6 +289,10 @@ select:focus{border-color:var(--accent)}
 .leaflet-popup-content{font-family:inherit;font-size:.9rem;line-height:1.45;margin:12px 14px}
 .leaflet-popup-content b{font-size:1.05rem}
 .leaflet-popup-content a{color:#1d4ed8;font-weight:700;text-decoration:none}
+.popacts{display:flex;gap:6px;margin-top:9px}
+.popacts button{flex:1;padding:7px 8px;border-radius:8px;border:1px solid #d2d4d8;background:#fff;
+  color:#16191d;font-size:.78rem;font-weight:700;cursor:pointer}
+.popacts button:hover{background:#f2f3f5}
 .mk{background:var(--ink);color:var(--bg);border-radius:13px;padding:3px 8px;font-size:.74rem;font-weight:800;
   white-space:nowrap;box-shadow:0 1px 4px rgba(0,0,0,.3);border:1.5px solid var(--bg)}
 .mk.fav{background:var(--accent);color:var(--accent-on)}
@@ -321,7 +325,7 @@ const st = {zone: D.zones[0]||null, tab:"props", q:"", srcs:new Set(), sort:"rec
 // Por defecto se guardan en ESTE navegador (localStorage). Si querés sincronizar
 // entre dispositivos, completá SUPA con tu proyecto Supabase (URL + key pública)
 // y creá la tabla radar_marks: pasa solo a cambiar estas 2 líneas.
-const SUPA = {url:"", key:""};
+const SUPA = {url:"https://zvcledihvvfuleobgkjr.supabase.co", key:"sb_publishable_YvMVRTmYiIWSx5-dBzQ5sQ_tkMPmtxx"};
 let MARKS = {};
 function _lsLoad(){ try{ return JSON.parse(localStorage.getItem("radar-marks")||"{}"); }catch(e){ return {}; } }
 function _lsSave(){ try{ localStorage.setItem("radar-marks", JSON.stringify(MARKS)); }catch(e){} }
@@ -345,6 +349,12 @@ async function setMark(id, state){
   else _lsSave();
 }
 function markOf(id){ return MARKS[id]; }
+async function markFromMap(id, kind){
+  const cur=markOf(id);
+  if(kind=="fav") await setMark(id, cur=="fav"?null:"fav");
+  else await setMark(id, cur=="discard"?null:"discard");
+  render();
+}
 
 function esc(s){return (s||"").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/"/g,"&quot;");}
 function money(p,c){ if(p==null) return "Consultar"; return (c||"")+" "+Math.round(p).toLocaleString("es-AR"); }
@@ -450,7 +460,11 @@ function initMap(){
      fillOpacity:1}).addTo(map);
    m.bindPopup(`<b>${money(x.price,x.cur)}</b><br>${esc(x.addr||"")}<br>`+
      `<span style="color:#888">${esc(x.ag||SRC[x.src]||"")}</span><br>`+
-     `<a href="${esc(x.url)}" target="_blank" rel="noopener">Ver aviso →</a>`);
+     `<a href="${esc(x.url)}" target="_blank" rel="noopener">Ver aviso →</a>`+
+     `<div class="popacts">`+
+       `<button onclick="markFromMap('${x.id}','fav')">${mk=='fav'?'★ Favorita':'☆ Favorita'}</button>`+
+       `<button onclick="markFromMap('${x.id}','discard')">${mk=='discard'?'↩ Restaurar':'✕ Descartar'}</button>`+
+     `</div>`);
    pts.push([x.lat,x.lon]); });
  if(pts.length) map.fitBounds(pts,{padding:[40,40],maxZoom:16});
  else if(poly.length) map.fitBounds(poly,{padding:[20,20]});
