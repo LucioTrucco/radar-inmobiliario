@@ -31,7 +31,7 @@ def _address(segs):
 
 
 def scrape(zone_name, listing_path="/casas-en-venta-en-banfield",
-           max_pages=8, delay=0.6, client=None):
+           max_pages=35, delay=0.6, client=None):
     own = client is None
     if own:
         client = httpx.Client(headers=HEADERS, timeout=30, follow_redirects=True)
