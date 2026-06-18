@@ -276,7 +276,7 @@ select:focus{border-color:var(--accent)}
 </div>
 <script>
 const D = __DATA__;
-const SRC = {argenprop:"ArgenProp", remax:"RE/MAX", tokko:"Inmobiliaria"};
+const SRC = {argenprop:"ArgenProp", remax:"RE/MAX", tokko:"Inmobiliaria", buscadorprop:"BuscadorProp"};
 const EV = {propiedad_nueva:"Propiedad nueva", baja_precio:"Bajó de precio",
  suba_precio:"Subió de precio", inmobiliaria_nueva:"Inmobiliaria nueva",
  propiedad_dada_de_baja:"Dada de baja"};
