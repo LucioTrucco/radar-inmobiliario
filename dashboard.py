@@ -317,9 +317,8 @@ select:focus{border-color:var(--accent)}
 const D = __DATA__;
 const SRC = {argenprop:"ArgenProp", remax:"RE/MAX", tokko:"Inmobiliaria", buscadorprop:"BuscadorProp", zonaprop:"ZonaProp", web:"Inmobiliaria"};
 const EV = {propiedad_nueva:"Propiedad nueva", baja_precio:"Bajó de precio",
- suba_precio:"Subió de precio", inmobiliaria_nueva:"Inmobiliaria nueva",
- propiedad_dada_de_baja:"Dada de baja"};
-const st = {zone: D.zones[0]||null, tab:"props", q:"", srcs:new Set(), sort:"recent", types:new Set(), show:24, view:"activas", map:false};
+ suba_precio:"Subió de precio", propiedad_dada_de_baja:"Dada de baja"};
+const st = {zone: D.zones[0]||null, tab:"props", q:"", srcs:new Set(), sort:"recent", types:new Set(), show:24, view:"activas", map:false, newsSort:"recent"};
 
 // ---- Marcas (favoritas/descartadas) ----
 // Por defecto se guardan en ESTE navegador (localStorage). Si querés sincronizar
@@ -374,14 +373,17 @@ function fListings(){ let a=D.listings.filter(x=>inZone(x.zones));
  if(st.sort=="recent") a.sort((p,q)=>(q.ts||"").localeCompare(p.ts||""));
  else a.sort((p,q)=>{const pv=p.price??1e15,qv=q.price??1e15; return st.sort=="asc"?pv-qv:qv-pv;});
  return a; }
-function fEvents(){ let a=D.events.filter(x=>inZone(x.zones));
- if(st.types.size) a=a.filter(x=>st.types.has(x.type)); return a.slice(0,200); }
+function fEvents(){ let a=D.events.filter(x=>inZone(x.zones) && x.type!="inmobiliaria_nueva");
+ if(st.types.size) a=a.filter(x=>st.types.has(x.type));
+ if(st.newsSort=="recent") a.sort((p,q)=>(q.ts||"").localeCompare(p.ts||""));
+ else { const pv=x=>(x.new!=null?x.new:x.price); a.sort((p,q)=>{const x=pv(p), y=pv(q); return st.newsSort=="asc"?(x==null?1e15:x)-(y==null?1e15:y):(y==null?-1:y)-(x==null?-1:x);}); }
+ return a.slice(0,200); }
 
 function renderHead(){
  document.getElementById("upd").textContent = D.updated? "Actualizado "+rel(D.updated):"";
  const ls=D.listings.filter(x=>inZone(x.zones));
  const ags=new Set(ls.map(x=>x.ag||x.src)).size;
- const wk=Date.now()-7*864e5; const nw=D.events.filter(x=>inZone(x.zones)&&new Date(x.ts)>=wk).length;
+ const wk=Date.now()-7*864e5; const nw=D.events.filter(x=>inZone(x.zones)&&x.type!="inmobiliaria_nueva"&&new Date(x.ts)>=wk).length;
  const lugar = st.zone? (D.zoneShort.find((s,i)=>D.zones[i]===st.zone)||"tu zona") : "Banfield y Lomas";
  document.getElementById("summary").innerHTML =
   `Vigilando <b class="tnum">${ls.length}</b> casas en ${esc(lugar)}, de <b class="tnum">${ags}</b> `+
@@ -474,7 +476,13 @@ function initMap(){
 
 function viewNews(){ const a=fEvents();
  const ch=Object.keys(EV).map(k=>`<button class="chip" data-type="${k}" aria-pressed="${st.types.has(k)}">${EV[k]}</button>`).join("");
- let h=`<div class="controls"><div class="toggles" role="group" aria-label="Filtrar por tipo">${ch}</div></div>
+ const ns=(val,l)=>`<button data-nsort="${val}" aria-pressed="${st.newsSort==val}">${l}</button>`;
+ let h=`<div class="barrow">
+   <div class="toggles" role="group" aria-label="Filtrar por tipo">${ch}</div>
+   <div class="sortbar" role="group" aria-label="Ordenar por">
+     <span class="lbl">Ordenar</span>${ns("recent","Recientes")}${ns("asc","Menor precio")}${ns("desc","Mayor precio")}
+   </div>
+ </div>
    <p class="count">${a.length} ${a.length==1?"novedad":"novedades"}${st.types.size?" · filtrado":""}</p>`;
  if(!a.length) return h+`<div class="empty"><b>Sin novedades en esta vista.</b>Cuando entre una casa nueva, baje un precio o aparezca una inmobiliaria, lo vas a ver acá.</div>`;
  h+=`<div>`+a.map(x=>{ let body="";
@@ -504,6 +512,7 @@ function render(){
 function wire(){
  const q=document.getElementById("q"); if(q) q.oninput=e=>{st.q=e.target.value;st.show=24;const p=e.target.selectionStart;render();const n=document.getElementById("q");if(n){n.focus();n.setSelectionRange(p,p);}};
  document.querySelectorAll("[data-sort]").forEach(b=>b.onclick=()=>{st.sort=b.dataset.sort;render();});
+ document.querySelectorAll("[data-nsort]").forEach(b=>b.onclick=()=>{st.newsSort=b.dataset.nsort;render();});
  const mo=document.getElementById("more"); if(mo) mo.onclick=()=>{st.show+=24;render();};
  document.querySelectorAll("[data-src]").forEach(c=>c.onclick=()=>{const k=c.dataset.src;st.srcs.has(k)?st.srcs.delete(k):st.srcs.add(k);st.show=24;render();});
  document.querySelectorAll("[data-type]").forEach(c=>c.onclick=()=>{const k=c.dataset.type;st.types.has(k)?st.types.delete(k):st.types.add(k);render();});
