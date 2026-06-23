@@ -12,7 +12,8 @@ mkdir -p data
   if [ ! -x .venv/bin/python ]; then
     python3 -m venv .venv && ./.venv/bin/pip install -q -r requirements.txt
   fi
-  ./.venv/bin/python run.py
+  ./.venv/bin/python -c "import playwright" 2>/dev/null || { ./.venv/bin/pip install -q playwright && ./.venv/bin/python -m playwright install chromium; }
+  RADAR_BROWSER=1 ./.venv/bin/python run.py
   git add data/radar.db
   if git diff --staged --quiet; then
     echo "Sin cambios."

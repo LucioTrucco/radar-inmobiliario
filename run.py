@@ -9,6 +9,7 @@ Esto es lo que va a ejecutar la nube (GitHub Actions) cada X horas en la Fase 2.
 """
 import argparse
 import json
+import os
 from collections import Counter
 
 import config
@@ -73,6 +74,18 @@ def run(max_pages=None):
         zname = config.WATCH_ZONES[0]["name"] if config.WATCH_ZONES else "Banfield"
         extra += buscadorprop.scrape(zname, config.BUSCADORPROP.get(
             "path", "/casas-en-venta-en-banfield"))
+        print()
+
+    # ---- Fuentes con navegador (Playwright): SOLO local (gated por env) ----
+    # ZonaProp bloquea servidores de datacenter, así que esto corre solo cuando
+    # se setea RADAR_BROWSER=1 (lo hace el actualizar.command / auto-update local).
+    if os.environ.get("RADAR_BROWSER"):
+        print("# ZonaProp (navegador headless — solo local)")
+        try:
+            from scrapers import zonaprop
+            extra += zonaprop.scrape(max_pages=getattr(config, "ZONAPROP_PAGES", 45))
+        except Exception as e:
+            print(f"  [zonaprop] error: {str(e)[:90]}")
         print()
 
     for lst in extra:

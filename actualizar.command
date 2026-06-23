@@ -15,7 +15,11 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
-echo "==> Buscando novedades (ArgenProp + RE/MAX + Tokko)..."
+# Navegador headless para ZonaProp (solo local). Se instala una sola vez.
+python -c "import playwright" 2>/dev/null || { pip install -q playwright && python -m playwright install chromium; }
+export RADAR_BROWSER=1
+
+echo "==> Buscando novedades (ArgenProp + RE/MAX + Tokko + BuscadorProp + ZonaProp)..."
 python run.py
 
 echo "==> Guardando y subiendo a la nube..."
