@@ -88,6 +88,15 @@ def run(max_pages=None):
             print(f"  [zonaprop] error: {str(e)[:90]}")
         print()
 
+        if getattr(config, "BROWSER_SITES", None):
+            print("# Inmobiliarias SPA (navegador — solo local)")
+            try:
+                from scrapers import browser_site
+                extra += browser_site.scrape_sites(config.BROWSER_SITES)
+            except Exception as e:
+                print(f"  [web] error: {str(e)[:90]}")
+            print()
+
     for lst in extra:
         for ev in process_listing(conn, lst):
             totals[ev] += 1

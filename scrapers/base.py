@@ -22,8 +22,10 @@ def find_address(segments):
     best = None
     for s in segments:
         s = s.strip()
-        if 4 <= len(s) <= 45 and re.search(r'\d', s) and not _NOISE.search(s):
-            # preferimos el que tenga una coma (Calle 1234, Localidad) o letras+numero
+        if not (4 <= len(s) <= 50 and re.search(r'\d', s) and not _NOISE.search(s)):
+            continue
+        # una dirección real tiene letras + espacio + número (no un código tipo BHO123)
+        if re.search(r'[A-Za-zÁÉÍÓÚáéíóúñ]\.?\s+.*\d', s):
             if "," in s or re.search(r'[A-Za-zÁÉÍÓÚáéíóúñ]\.?\s+\d', s):
                 return s
             best = best or s

@@ -62,6 +62,14 @@ TOKKO_SITES = [
     {"name": "Lesza", "url": "https://www.lesza.com.ar", "listing_path": "/Venta"},
 ]
 
+# Sitios de inmobiliarias que cargan por JavaScript (SPA) → navegador (Playwright).
+# Solo corren localmente (RADAR_BROWSER=1). Para sumar otra: {name, url}.
+# (Cassia, Di Paola, Palumbo, Sortino NO van acá: ya entran por el portal BuscadorProp.)
+BROWSER_SITES = [
+    {"name": "Puente", "url": "https://puente.com.ar/propiedades?operation_types=1&property_types=3"},
+    {"name": "Brusi", "url": "https://www.brusiinmuebles.com/Venta"},
+]
+
 WATCH_ZONES = [
     {
         "name": "Banfield Oeste (Alem/Croce/Uriarte/Portela)",
