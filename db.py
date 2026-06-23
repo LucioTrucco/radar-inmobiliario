@@ -13,11 +13,22 @@ Tablas:
                      inmobiliaria_nueva, propiedad_dada_de_baja)
 """
 import json
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
 
 import geo
+
+
+def addr_key(addr):
+    """Clave de dirección para deduplicar la MISMA casa publicada en varias
+    fuentes (mismas 7 primeras letras de la calle + altura). Igual al dashboard."""
+    m = re.search(r"(\d{2,5})", addr or "")
+    if not m:
+        return None
+    street = re.sub(r"[^a-záéíóúñ]", "", addr.split(m.group(1))[0].lower())[:7]
+    return f"{street}|{m.group(1)}" if street else None
 
 DB_PATH = Path(__file__).parent / "data" / "radar.db"
 
@@ -48,7 +59,8 @@ CREATE TABLE IF NOT EXISTS listings (
     lat           REAL,
     lon           REAL,
     geocoded      INTEGER,            -- NULL=pendiente, 1=ok, -1=falló
-    zones         TEXT                -- JSON con los nombres de zona que contienen la propiedad
+    zones         TEXT,               -- JSON con los nombres de zona que contienen la propiedad
+    dkey          TEXT                -- clave de dirección para deduplicar entre fuentes
 );
 
 CREATE TABLE IF NOT EXISTS price_history (
@@ -94,7 +106,7 @@ def _migrate(conn):
     """Agrega columnas nuevas a bases ya existentes (sin perder datos)."""
     cols = {r["name"] for r in conn.execute("PRAGMA table_info(listings)")}
     for name, decl in [("lat", "REAL"), ("lon", "REAL"),
-                       ("geocoded", "INTEGER"), ("zones", "TEXT")]:
+                       ("geocoded", "INTEGER"), ("zones", "TEXT"), ("dkey", "TEXT")]:
         if name not in cols:
             conn.execute(f"ALTER TABLE listings ADD COLUMN {name} {decl}")
     conn.commit()
@@ -143,6 +155,11 @@ def process_listing(conn, lst):
 
     if row is None:
         # --- propiedad nueva ---
+        dkey = addr_key(lst.address)
+        # Si la MISMA casa ya está (activa) por otra fuente, la guardamos igual
+        # pero NO la marcamos como novedad (evita el doble aviso entre fuentes).
+        es_dupe = bool(dkey and conn.execute(
+            "SELECT 1 FROM listings WHERE dkey=? AND active=1 LIMIT 1", (dkey,)).fetchone())
         conn.execute(
             "INSERT INTO listings (uid, source, source_id, url, title, address, price, "
             "currency, bedrooms, rooms, zone, agency_id, agency_name, raw, first_seen, "
@@ -152,13 +169,15 @@ def process_listing(conn, lst):
              lst.agency_id, lst.agency_name, json.dumps(lst.raw, ensure_ascii=False),
              ts, ts),
         )
+        conn.execute("UPDATE listings SET dkey=? WHERE uid=?", (dkey, lst.uid))
         conn.execute("INSERT INTO price_history VALUES (?,?,?,?)",
                      (lst.uid, lst.price, lst.currency, ts))
-        _add_event(conn, "propiedad_nueva", lst.uid, lst.zone,
-                   lst.title or lst.address,
-                   {"price": lst.price, "currency": lst.currency,
-                    "address": lst.address, "url": lst.url})
-        events.append("propiedad_nueva")
+        if not es_dupe:
+            _add_event(conn, "propiedad_nueva", lst.uid, lst.zone,
+                       lst.title or lst.address,
+                       {"price": lst.price, "currency": lst.currency,
+                        "address": lst.address, "url": lst.url})
+            events.append("propiedad_nueva")
     else:
         # --- propiedad existente: ¿cambió el precio? ---
         old_price = row["price"]
