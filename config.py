@@ -60,6 +60,7 @@ TOKKO_SITES = [
     {"name": "Cabrera", "url": "https://www.cabrerapropiedades.com.ar", "listing_path": "/Venta"},
     {"name": "Juan Barrozo", "url": "https://www.juanbarrozopropiedades.com.ar", "listing_path": "/Venta"},
     {"name": "Lesza", "url": "https://www.lesza.com.ar", "listing_path": "/Venta"},
+    {"name": "Cynthia Luraschi", "url": "https://www.cynthialuraschiprop.com.ar", "listing_path": "/Venta"},
 ]
 
 # Sitios de inmobiliarias que cargan por JavaScript (SPA) → navegador (Playwright).
