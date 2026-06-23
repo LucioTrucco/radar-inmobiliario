@@ -192,10 +192,12 @@ def process_listing(conn, lst):
                         "diff": lst.price - old_price, "url": lst.url})
             events.append(kind)
 
+        # COALESCE en agency_name: si la fuente no trae nombre (ej: ArgenProp solo
+        # da el ID), conservamos el que ya resolvió el enriquecedor, no lo pisamos.
         conn.execute(
             "UPDATE listings SET url=?, title=?, address=?, price=?, currency=?, "
-            "bedrooms=?, rooms=?, agency_id=?, agency_name=?, raw=?, last_seen=?, active=1 "
-            "WHERE uid=?",
+            "bedrooms=?, rooms=?, agency_id=?, agency_name=COALESCE(?, agency_name), "
+            "raw=?, last_seen=?, active=1 WHERE uid=?",
             (lst.url, lst.title, lst.address, lst.price, lst.currency, lst.bedrooms,
              lst.rooms, lst.agency_id, lst.agency_name,
              json.dumps(lst.raw, ensure_ascii=False), ts, lst.uid),
