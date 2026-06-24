@@ -15,11 +15,14 @@ if [ ! -d ".venv" ]; then
 fi
 source .venv/bin/activate
 
-# Navegador headless para ZonaProp (solo local). Se instala una sola vez.
-python -c "import playwright" 2>/dev/null || { pip install -q playwright && python -m playwright install chromium; }
-export RADAR_BROWSER=1
-
-echo "==> Buscando novedades (ArgenProp + RE/MAX + Tokko + BuscadorProp + ZonaProp)..."
+# Modo navegador: si el que llama setea RADAR_BROWSER=1, sumamos ZonaProp
+# (necesita Playwright, se instala una sola vez). Si no, corrida rápida sin él.
+if [ "$RADAR_BROWSER" = "1" ]; then
+  python -c "import playwright" 2>/dev/null || { pip install -q playwright && python -m playwright install chromium; }
+  echo "==> Buscando novedades CON ZonaProp (ArgenProp + RE/MAX + Tokko + BuscadorProp + ZonaProp)... — más lento"
+else
+  echo "==> Buscando novedades rápido, SIN ZonaProp (ArgenProp + RE/MAX + Tokko + BuscadorProp)..."
+fi
 python run.py
 
 echo "==> Guardando y subiendo a la nube..."
