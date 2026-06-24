@@ -106,12 +106,16 @@ def _load(page, url, delay_ms):
 
 
 def scrape(zone_slug="casas-venta-banfield", zone_name="Banfield",
-           max_pages=45, delay_ms=2200, solo_casas=True):
+           max_pages=45, delay_ms=2200, solo_casas=True, headful=False):
+    """headful=True muestra el navegador (para ver cómo trabaja); por defecto va
+    invisible (más rápido y no tapa la pantalla)."""
+    import os
     import random
     from playwright.sync_api import sync_playwright
+    headful = headful or bool(os.environ.get("RADAR_HEADFUL"))
     listings, seen = [], set()
     with sync_playwright() as p:
-        browser = p.chromium.launch(headless=True, args=[
+        browser = p.chromium.launch(headless=not headful, args=[
             "--disable-blink-features=AutomationControlled", "--no-sandbox"])
         ctx = browser.new_context(
             locale="es-AR", timezone_id="America/Argentina/Buenos_Aires",
