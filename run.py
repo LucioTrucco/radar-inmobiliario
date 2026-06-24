@@ -120,6 +120,20 @@ def run(max_pages=None):
         print(f"  nombradas: {a['resueltas']}/{a['pendientes']}\n")
 
     summary = dict(totals)
+
+    # Cuántas novedades de ESTA corrida caen en TU zona + presupuesto (lo que
+    # realmente vas a ver en el dashboard), para no confundir con el total del
+    # partido entero.
+    cap = getattr(config, "MAX_PRICE_USD", None)
+    q = ("SELECT e.type, COUNT(*) FROM events e JOIN listings l ON e.uid=l.uid "
+         "WHERE e.created_at >= ? AND l.zones IS NOT NULL AND l.zones != '[]'")
+    params = [run_started]
+    if cap:
+        q += " AND NOT (l.currency='USD' AND l.price > ?)"
+        params.append(cap)
+    q += " GROUP BY e.type"
+    en_zona = dict(conn.execute(q, params).fetchall())
+
     conn.execute(
         "INSERT INTO runs (started_at, finished_at, summary) VALUES (?,?,?)",
         (run_started, now_iso(), json.dumps(summary, ensure_ascii=False)),
@@ -127,19 +141,25 @@ def run(max_pages=None):
     conn.commit()
     conn.close()
 
-    print("== Resumen de novedades ==")
-    if not summary:
-        print("  Sin novedades.")
+    zname = (config.WATCH_ZONES[0]["name"].split(" (")[0]
+             if config.WATCH_ZONES else "tu zona")
     labels = {
         "propiedad_nueva": "🆕 Propiedades nuevas",
         "baja_precio": "📉 Bajas de precio",
         "suba_precio": "📈 Subas de precio",
-        "inmobiliaria_nueva": "🏢 Inmobiliarias nuevas",
         "propiedad_dada_de_baja": "❌ Dadas de baja",
     }
+    print("== Resumen de novedades (todo el partido · EN TU ZONA ≤ tope) ==")
+    hubo = False
     for key, label in labels.items():
         if summary.get(key):
-            print(f"  {label}: {summary[key]}")
+            hubo = True
+            print(f"  {label}: {summary[key]} en total · "
+                  f"**{en_zona.get(key, 0)} en {zname}**")
+    if not hubo:
+        print("  Sin novedades.")
+    elif not any(en_zona.get(k) for k in labels):
+        print(f"  (Hoy no entró nada nuevo en {zname} dentro de tu presupuesto.)")
     return summary
 
 
