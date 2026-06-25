@@ -2,108 +2,108 @@
 Scraper genérico de sitios en la plataforma grupotodo / BuscadorProp.
 
 Muchísimas inmobiliarias de la zona usan esta plataforma (Cassia Alfano, Palumbo,
-Di Paola, Sortino, Fabián Foce, etc.). Sus sitios cargan el listado por JS, pero
-la FICHA de cada propiedad trae los datos en el HTML (server-side): título con
-tipo + localidad, "price": N, y la dirección. Así sacamos sus avisos DIRECTO de
-cada inmobiliaria — incluso los que no estén en ArgenProp / ZonaProp / el portal.
+Di Paola, Sortino, Fabián Foce, etc.). El listado es scroll-infinito por JS, pero
+una vez renderizado, CADA tarjeta ya trae todo: tipo, dirección + localidad y
+precio. Así sacamos sus avisos DIRECTO de cada inmobiliaria — incluso los que no
+estén en ArgenProp / ZonaProp / el portal — en una sola pasada de navegador
+(sin bajar ficha por ficha).
 
 Un scraper sirve para todas: solo cambia el dominio y el nombre.
 """
 import re
-import httpx
-from bs4 import BeautifulSoup
 
 from .base import Listing
 
-HEADERS = {"User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-           "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"}
+UA = ("Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 "
+      "(KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36")
+
+# Localidades que nos interesan (partido de Lomas de Zamora y alrededores cercanos).
+# Las de otros lados (Lanús, costa, etc.) las descartamos para no inflar la base.
+ZONA_LOCS = re.compile(r'banfield|lomas de zamora|temperley|llavallol|turdera|'
+                       r'ingeniero budge|villa centenario|villa fiorito', re.I)
+PRICE_RE = re.compile(r'(USD|U\$S|US\$|\$)\s?([\d.]{3,})')
 
 
-def _detail(client, base_url, pid, agency_name):
-    try:
-        html = client.get(f"{base_url}/propiedad/{pid}").text
-    except Exception:
-        return None, None
-    soup = BeautifulSoup(html, "lxml")
-    title = (soup.title.get_text() if soup.title else "")
-    parts = [p.strip() for p in title.split(" - ")]
-    tipo = parts[0].lower() if parts else ""
-    localidad = parts[1] if len(parts) > 1 else ""
-
-    pm = re.search(r'"price"\s*:\s*"?([\d.]+)', html)
-    price = float(pm.group(1).replace(".", "")) if pm else None
-    cur = "USD" if re.search(r'(USD|U\$S|US\$)', html) else ("ARS" if price else "?")
-
-    # dirección + localidad: "Calle 1234, Localidad" en el encabezado de la ficha
-    addr = ""
-    LOC = (r'(Banfield Oeste|Banfield Este|Banfield|Lomas de Zamora|Temperley|'
-           r'Llavallol|Turdera|Lan[uú]s\s?\w*|Remedios de Escalada|Monte Chingolo|'
-           r'Monte Grande|Saran[dí]\w*|Ingeniero Budge|Villa\s\w+)')
-    am = re.search(r'([A-ZÁÉÍÓÚ][\wÁÉÍÓÚáéíóúñ.\'’ ]{2,30}\s\d{1,5})\s*,\s*' + LOC, html)
-    if am:
-        addr = am.group(1).strip()
-        localidad = am.group(2).strip()  # localidad REAL (más confiable que el título)
-
-    bm = re.search(r'(\d+)\s*[Dd]ormitorio', html) or re.search(r'(\d+)\s*[Aa]mbiente', html)
-    beds = int(bm.group(1)) if bm else None
-
+def _parse_card(text, href, agency_name):
+    lines = [l.strip() for l in text.split("\n") if l.strip()]
+    if len(lines) < 3:
+        return None, ""
+    op_tipo = lines[0].lower()                 # ej: "VENTA CASAS" / "ALQUILER DEPARTAMENTOS"
+    # dirección + localidad: la línea con "Calle 1234, Localidad"
+    addr, localidad = "", ""
+    for l in lines[1:4]:
+        if "," in l and re.search(r'\d', l):
+            partes = l.rsplit(",", 1)
+            addr, localidad = partes[0].strip(), partes[1].strip()
+            break
+    price, cur = None, "?"
+    for l in lines:
+        m = PRICE_RE.search(l)
+        if m:
+            cur = "USD" if m.group(1).upper() in ("USD", "U$S", "US$") else "ARS"
+            price = float(m.group(2).replace(".", ""))
+            break
+    bm = re.search(r'(\d+)\s*[Dd]ormitorio', text)
+    tipo = "casa" if "casa" in op_tipo else ("otro" if op_tipo else "")
+    venta = "venta" in op_tipo or "venta" not in op_tipo and "alquiler" not in op_tipo
+    m = re.search(r'/propiedad/(\d+)', href)
+    pid = m.group(1) if m else href
     return Listing(
         source="grupotodo",
         source_id=f"{agency_name}:{pid}",
-        url=f"{base_url}/propiedad/{pid}",
+        url=href if href.startswith("http") else "",
         title=f"{tipo.title()} en {localidad}".strip() or "Propiedad",
-        address=addr,
-        price=price, currency=cur, bedrooms=beds,
+        address=addr, price=price, currency=cur,
+        bedrooms=int(bm.group(1)) if bm else None,
         agency_id=agency_name, agency_name=agency_name,
-        raw={"locality": localidad, "tipo": tipo}), tipo
+        raw={"locality": localidad, "tipo": tipo, "venta": venta}), (tipo, localidad, venta)
 
 
-def _enumerar_ids(base_url, max_scrolls=60):
-    """El listado es scroll infinito por JS: usamos el navegador para bajar todos
-    los IDs de propiedad. (Las fichas después se bajan rápido con httpx.)"""
+def scrape_site(base_url, agency_name, solo_casas=True, max_scrolls=70):
     from playwright.sync_api import sync_playwright
-    ids = []
+    base_url = base_url.rstrip("/")
+    listings, seen = [], set()
     with sync_playwright() as p:
         b = p.chromium.launch(headless=True, args=["--disable-blink-features=AutomationControlled"])
-        pg = b.new_context(locale="es-AR", user_agent=HEADERS["User-Agent"],
+        pg = b.new_context(locale="es-AR", user_agent=UA,
                            viewport={"width": 1366, "height": 1000}).new_page()
         try:
             pg.goto(base_url + "/propiedades", timeout=45000, wait_until="domcontentloaded")
-            pg.wait_for_timeout(2500)
+            pg.wait_for_timeout(2800)
             prev = -1
             for i in range(max_scrolls):
                 pg.mouse.wheel(0, 5000)
-                pg.wait_for_timeout(650)
-                cur = pg.content()
-                n = len(set(re.findall(r'/propiedad/(\d+)', cur)))
+                pg.wait_for_timeout(600)
+                n = len(pg.query_selector_all("a[href*='/propiedad/']"))
                 if n == prev and i > 3:
                     break
                 prev = n
-            ids = list(dict.fromkeys(re.findall(r'/propiedad/(\d+)', pg.content())))
+            cards = pg.query_selector_all("a[href*='/propiedad/']")
+            for card in cards:
+                href = card.get_attribute("href") or ""
+                if not re.search(r'/propiedad/\d+', href):
+                    continue
+                if href.startswith("/"):
+                    href = base_url + href
+                try:
+                    txt = card.inner_text()
+                except Exception:
+                    continue
+                lst, info = _parse_card(txt, href, agency_name)
+                if not lst or lst.source_id in seen:
+                    continue
+                tipo, localidad, venta = info
+                if solo_casas and tipo and tipo != "casa":
+                    continue
+                if not venta:
+                    continue
+                if localidad and not ZONA_LOCS.search(localidad):
+                    continue          # de otra zona (Lanús, costa, etc.) -> descartar
+                seen.add(lst.source_id)
+                listings.append(lst)
+            print(f"  [grupotodo:{agency_name}] {len(listings)} casas en zona (de {len(cards)} avisos)")
         except Exception as e:
-            print(f"  [grupotodo] error enumerando ({str(e)[:50]})")
+            print(f"  [grupotodo:{agency_name}] error: {str(e)[:60]}")
         finally:
             b.close()
-    return ids
-
-
-def scrape_site(base_url, agency_name, solo_casas=True, client=None, max_props=400):
-    base_url = base_url.rstrip("/")
-    own = client is None
-    if own:
-        client = httpx.Client(headers=HEADERS, timeout=30, follow_redirects=True)
-    listings = []
-    try:
-        ids = _enumerar_ids(base_url)[:max_props]
-        for pid in ids:
-            lst, tipo = _detail(client, base_url, pid, agency_name)
-            if not lst:
-                continue
-            if solo_casas and tipo and "casa" not in tipo:
-                continue
-            listings.append(lst)
-        print(f"  [grupotodo:{agency_name}] {len(listings)} casas (de {len(ids)} propiedades)")
-    finally:
-        if own:
-            client.close()
     return listings

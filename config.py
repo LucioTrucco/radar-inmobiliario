@@ -77,6 +77,29 @@ BROWSER_SITES = [
 # Para sumar otra: agregás {"name", "url"}.
 GRUPOTODO_SITES = [
     {"name": "Cassia Alfano Propiedades", "url": "https://www.cassiaalfano.com.ar"},
+    {"name": "Carlos Palumbo Propiedades", "url": "https://www.palumboprop.com.ar"},
+    {"name": "Di Paola Inmobiliaria", "url": "https://www.inmobiliariadipaola.com.ar"},
+    {"name": "Sortino Propiedades", "url": "https://www.sortinopropiedades.com"},
+    {"name": "Fabián Foce", "url": "https://www.fabianfoce.com"},
+    {"name": "Fandiño Propiedades", "url": "https://fandiprop.com.ar"},
+    {"name": "Adrián Mitre Propiedades", "url": "https://www.adrianmitreprop.com.ar"},
+    {"name": "Báez Propiedades", "url": "https://www.baezpropiedades.com.ar"},
+    {"name": "Caporale Propiedades", "url": "https://www.caporalepropiedades.com.ar"},
+    {"name": "Caruso Propiedades", "url": "https://www.carusoprop.com.ar"},
+    {"name": "Fernández González", "url": "https://www.fernandezgonzalez.com"},
+    {"name": "Franco Propiedades", "url": "https://www.francoprop.com.ar"},
+    {"name": "García Gutiérrez Inmobiliaria", "url": "https://www.garciagutierrez.com.ar"},
+    {"name": "Graciela Rodriguez Propiedades", "url": "https://www.gracielarodriguezprop.com"},
+    {"name": "Leandro Propiedades", "url": "https://www.leandropropiedades.com.ar"},
+    {"name": "Lorenzo Sosa Propiedades", "url": "https://www.lorenzososaprop.com.ar"},
+    {"name": "Perla Fernández Propiedades", "url": "https://www.pfpropiedades.com.ar"},
+    {"name": "Repetto Propiedades", "url": "https://www.repettopropiedades.com"},
+    {"name": "Silvia Barandiaran (SCB)", "url": "https://www.scbprop.com"},
+    {"name": "Tevez Propiedades", "url": "https://www.tevezpropiedades.com.ar"},
+    {"name": "Trezza Propiedades", "url": "https://www.trezzapropiedades.com.ar"},
+    {"name": "Vieytes Propiedades", "url": "https://www.vieytespropiedades.com.ar"},
+    {"name": "Villa Propiedades", "url": "https://www.villapropiedades.com"},
+    {"name": "Zabala Propiedades", "url": "https://www.zabalaprop.com.ar"},
 ]
 
 WATCH_ZONES = [
