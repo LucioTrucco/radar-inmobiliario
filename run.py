@@ -88,6 +88,16 @@ def run(max_pages=None):
             print(f"  [zonaprop] error: {str(e)[:90]}")
         print()
 
+        if getattr(config, "GRUPOTODO_SITES", None):
+            print("# Inmobiliarias grupotodo/BuscadorProp (directo de su web)")
+            from scrapers import grupotodo
+            for site in config.GRUPOTODO_SITES:
+                try:
+                    extra += grupotodo.scrape_site(site["url"], site["name"])
+                except Exception as e:
+                    print(f"  [grupotodo:{site['name']}] error: {str(e)[:70]}")
+            print()
+
         if getattr(config, "BROWSER_SITES", None):
             print("# Inmobiliarias SPA (navegador — solo local)")
             try:

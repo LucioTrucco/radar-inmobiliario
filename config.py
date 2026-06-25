@@ -71,6 +71,14 @@ BROWSER_SITES = [
     {"name": "Brusi", "url": "https://www.brusiinmuebles.com/Venta"},
 ]
 
+# Inmobiliarias en la plataforma grupotodo/BuscadorProp: las scrapeamos DIRECTO
+# (su web) para captar avisos que no estén en los portales. Necesita navegador
+# para enumerar (scroll infinito), así que corre solo en modo completo (local).
+# Para sumar otra: agregás {"name", "url"}.
+GRUPOTODO_SITES = [
+    {"name": "Cassia Alfano Propiedades", "url": "https://www.cassiaalfano.com.ar"},
+]
+
 WATCH_ZONES = [
     {
         "name": "Banfield Oeste (Alem/Croce/Uriarte/Portela)",
