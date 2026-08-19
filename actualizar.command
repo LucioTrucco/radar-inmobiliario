@@ -9,8 +9,12 @@ echo "==> Trayendo la última versión de la nube..."
 git fetch -q origin && git reset --hard -q origin/main
 
 echo "==> Preparando entorno..."
-if [ ! -d ".venv" ]; then
-  python3 -m venv .venv
+PY="$(command -v python3 || echo /opt/homebrew/bin/python3)"
+if [ ! -x ".venv/bin/python" ]; then
+  echo "    (entorno faltante o roto: lo recreo...)"
+  rm -rf .venv
+  "$PY" -m venv .venv
+  ./.venv/bin/pip install -q --upgrade pip
   ./.venv/bin/pip install -q -r requirements.txt
 fi
 source .venv/bin/activate
